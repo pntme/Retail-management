@@ -1,0 +1,2403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Retail Management System</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    /* prevent page-level horizontal scroll while allowing table-level scroll */
+    html, body { overflow-x: hidden; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const API_URL = 'http://localhost:3001/api';
+    const AuthContext = React.createContext();
+
+    function AuthProvider({ children }) {
+      const [token, setToken] = useState(localStorage.getItem('token'));
+      const [user, setUser] = useState(() => {
+        try { const u = localStorage.getItem('user'); return u ? JSON.parse(u) : null; } catch { return null; }
+      });
+
+      const login = (t, u) => { localStorage.setItem('token', t); localStorage.setItem('user', JSON.stringify(u)); setToken(t); setUser(u); };
+      const logout = () => { localStorage.removeItem('token'); localStorage.removeItem('user'); setToken(null); setUser(null); };
+
+      return <AuthContext.Provider value={{ token, user, login, logout, isAuthenticated: !!token }}>{children}</AuthContext.Provider>;
+    }
+
+    async function apiCall(endpoint, options = {}) {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json', ...(token && { 'Authorization': `Bearer ${token}` }), ...options.headers };
+      const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
+      if (!res.ok) {
+        let err;
+        try { err = await res.json(); } catch { err = { error: 'Request failed' }; }
+        throw new Error(err.error || 'Request failed');
+      }
+      return res.json();
+    }
+
+    function Login() {
+      const { login } = React.useContext(AuthContext);
+      const [username, setUsername] = useState('admin');
+      const [password, setPassword] = useState('admin123');
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError(''); setLoading(true);
+        try {
+          const data = await apiCall('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+          login(data.token, data.user);
+        } catch (err) { setError(err.message); } finally { setLoading(false); }
+      };
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl w-96">
+            <div className="text-center mb-6">
+              <h1 className="text-3xl font-bold text-gray-800">Retail Manager</h1>
+              <p className="text-gray-600">Welcome back</p>
+            </div>
+            <form onSubmit={handleSubmit}>
+              <label className="block text-sm font-medium text-gray-700">Username</label>
+              <input value={username} onChange={e => setUsername(e.target.value)} className="w-full px-3 py-2 border rounded mb-3" required />
+              <label className="block text-sm font-medium text-gray-700">Password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-3 py-2 border rounded mb-4" required />
+              {error && <div className="text-red-600 mb-3">{error}</div>}
+              <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded">{loading ? 'Logging in...' : 'Login'}</button>
+            </form>
+            <div className="mt-4 text-sm text-gray-600">Default: admin / admin123</div>
+          </div>
+        </div>
+      );
+    }
+
+    function Modal({ children, onClose, wide=false }) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+          <div className={`bg-white rounded-lg shadow-2xl ${wide ? 'max-w-5xl w-full' : 'max-w-2xl w-full'} max-h-[90vh] overflow-y-auto relative`}>
+            <button onClick={onClose} className="absolute top-3 right-3 text-gray-600 hover:text-gray-900 text-2xl">×</button>
+            <div className="p-6">{children}</div>
+          </div>
+        </div>
+      );
+    }
+
+    function ConfirmModal({ title, message, onConfirm, onCancel }) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-md w-full relative">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-4">{title}</h2>
+              <p className="text-gray-700 mb-6">{message}</p>
+              <div className="flex gap-3 justify-end">
+                <button onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition">Cancel</button>
+                <button onClick={onConfirm} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function StatCard({ title, value, icon, color }) {
+      return (
+        <div className="bg-white p-6 rounded shadow hover:shadow-lg transition">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-2xl">{icon}</div>
+            <div className={`${color} w-10 h-10 rounded-full flex items-center justify-center text-white`}>{icon}</div>
+          </div>
+          <div className="text-sm text-gray-600">{title}</div>
+          <div className="text-2xl font-bold mt-2">{value}</div>
+        </div>
+      );
+    }
+
+    // ------------------ Customers component (with requested changes) ------------------
+    function Customers() {
+      const [customers, setCustomers] = useState([]);
+      const [search, setSearch] = useState('');
+      const [showForm, setShowForm] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const [showView, setShowView] = useState(false);
+      const [viewCustomer, setViewCustomer] = useState(null);
+      const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+      const [deleteId, setDeleteId] = useState(null);
+
+      const initialForm = {
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        vehicle_number: '',
+        vehicle_type: '',
+        last_service_date: '',
+        next_service_date: ''
+      };
+
+      const [form, setForm] = useState(initialForm);
+
+      useEffect(() => { loadCustomers(); }, [search]);
+
+      const loadCustomers = async () => {
+        try {
+          const data = await apiCall(`/customers?search=${encodeURIComponent(search)}`);
+          setCustomers(data);
+        } catch (err) { console.error(err); }
+      };
+
+      // helper to normalize vehicle number: uppercase + non-alphanumeric removed
+      const normalizeVehicleNumber = (value) => {
+        if (!value) return '';
+        return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      };
+
+      const onVehicleNumberChange = (value) => {
+        setForm(prev => ({ ...prev, vehicle_number: normalizeVehicleNumber(value) }));
+      };
+
+      const validateForm = () => {
+        if (!form.name.trim()) { alert('Name is required'); return false; }
+        if (!form.vehicle_type.trim()) { alert('Vehicle type is required'); return false; }
+        if (!form.vehicle_number.trim()) { alert('Vehicle number is required'); return false; }
+        // vehicle_number must be alphanumeric uppercase (after normalization)
+        const vn = form.vehicle_number;
+        if (!/^[A-Z0-9]+$/.test(vn)) { alert('Vehicle number must be alphanumeric (A-Z,0-9)'); return false; }
+        if (!form.phone.trim()) { alert('Phone number is required'); return false; }
+        // optional: basic phone format check
+        if (!/^[0-9+\- ]{6,20}$/.test(form.phone)) { if(!confirm('Phone looks unusual. Continue?')) return false; }
+        return true;
+      };
+
+      const openCreate = () => { setEditing(null); setForm(initialForm); setShowForm(true); };
+      const openEdit = (c) => {
+        setEditing(c);
+        setForm({
+          name: c.name ?? '',
+          email: c.email ?? '',
+          phone: c.phone ?? '',
+          address: c.address ?? '',
+          vehicle_number: c.vehicle_number ?? '',
+          vehicle_type: c.vehicle_type ?? '',
+          last_service_date: c.last_service_date ?? '',
+          next_service_date: c.next_service_date ?? ''
+        });
+        setShowForm(true);
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!validateForm()) return;
+        try {
+          if (editing) {
+            await apiCall(`/customers/${editing.id}`, { method: 'PUT', body: JSON.stringify(form) });
+          } else {
+            await apiCall('/customers', { method: 'POST', body: JSON.stringify(form) });
+          }
+          setShowForm(false); setEditing(null); setForm(initialForm); loadCustomers();
+        } catch (err) { alert(err.message); }
+      };
+
+      const handleDelete = async (id) => {
+        setDeleteId(id);
+        setShowDeleteConfirm(true);
+      };
+
+      const confirmDelete = async () => {
+        try { 
+          await apiCall(`/customers/${deleteId}`, { method: 'DELETE' }); 
+          loadCustomers(); 
+        } catch (err) { 
+          alert(err.message); 
+        }
+        setShowDeleteConfirm(false);
+        setDeleteId(null);
+      };
+
+      const cancelDelete = () => {
+        setShowDeleteConfirm(false);
+        setDeleteId(null);
+      };
+
+      const handleView = (customer) => { setViewCustomer(customer); setShowView(true); };
+
+      return (
+        <div>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-800">Customers</h1>
+            <div className="flex items-center gap-3">
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by name, phone, email, vehicle..."
+                className="px-3 py-2 border rounded-lg w-72"
+              />
+              <button onClick={openCreate} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Add Customer</button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            {/* table-level horizontal scroll only */}
+            <div className="w-full overflow-x-auto">
+              <table className="min-w-[900px] w-full table-auto">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle No.</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Service</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next Service</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {customers.map(c => (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          {/* view icon */}
+                          <button title="View" onClick={() => handleView(c)} className="text-gray-600 hover:text-gray-900">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7S3.732 16.057 2.458 12z" />
+                            </svg>
+                          </button>
+
+                          {/* edit icon */}
+                          <button title="Edit" onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M17.414 2.586a2 2 0 010 2.828L8.414 14.414a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464L14.586 2.586a2 2 0 012.828 0z" />
+                            </svg>
+                          </button>
+
+                          {/* delete icon */}
+                          <button title="Delete" onClick={() => handleDelete(c.id)} className="text-red-600 hover:text-red-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H3a1 1 0 100 2h14a1 1 0 100-2h-2V3a1 1 0 00-1-1H6zm2 6a1 1 0 10-2 0v7a1 1 0 102 0V8zm6 0a1 1 0 10-2 0v7a1 1 0 102 0V8z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap max-w-xs overflow-hidden text-ellipsis font-medium">{c.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{c.phone}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{c.vehicle_type || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap font-mono">{c.vehicle_number || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{c.last_service_date || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{c.next_service_date || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Create / Edit Modal */}
+          {showForm && (
+            <Modal onClose={() => { setShowForm(false); setEditing(null); }} wide={false}>
+              <h2 className="text-2xl font-bold mb-4">{editing ? 'Edit Customer' : 'Add Customer'}</h2>
+              <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Name *</label>
+                    <input type="text" value={form.name} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Vehicle Type *</label>
+                    <input type="text" value={form.vehicle_type} onChange={e => setForm(prev => ({ ...prev, vehicle_type: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Vehicle Number *</label>
+                    <input
+                      type="text"
+                      value={form.vehicle_number}
+                      onChange={e => onVehicleNumberChange(e.target.value)}
+                      className="w-full px-3 py-2 border rounded"
+                      placeholder="Alphanumeric - will be uppercased"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Only A-Z and 0-9 are allowed. Will be stored in uppercase.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Phone *</label>
+                    <input type="text" value={form.phone} onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Email</label>
+                    <input type="email" value={form.email} onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Last Service Date</label>
+                    <input type="date" value={form.last_service_date} onChange={e => setForm(prev => ({ ...prev, last_service_date: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Next Service Date</label>
+                    <input type="date" value={form.next_service_date} onChange={e => setForm(prev => ({ ...prev, next_service_date: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium mb-1">Address</label>
+                    <textarea value={form.address} onChange={e => setForm(prev => ({ ...prev, address: e.target.value }))} rows="3" className="w-full px-3 py-2 border rounded"></textarea>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-4">
+                  <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">{editing ? 'Update' : 'Create'}</button>
+                </div>
+              </form>
+            </Modal>
+          )}
+
+          {/* View modal */}
+          {showView && viewCustomer && (
+            <Modal onClose={() => { setShowView(false); setViewCustomer(null); }} wide={false}>
+              <h2 className="text-2xl font-bold mb-4">Customer Details</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div><div className="text-sm text-gray-500">Name</div><div className="font-medium">{viewCustomer.name}</div></div>
+                <div><div className="text-sm text-gray-500">Vehicle Type</div><div className="font-medium">{viewCustomer.vehicle_type || '-'}</div></div>
+                <div><div className="text-sm text-gray-500">Vehicle Number</div><div className="font-medium">{viewCustomer.vehicle_number || '-'}</div></div>
+                <div><div className="text-sm text-gray-500">Phone</div><div className="font-medium">{viewCustomer.phone}</div></div>
+                <div><div className="text-sm text-gray-500">Email</div><div className="font-medium">{viewCustomer.email || '-'}</div></div>
+                <div><div className="text-sm text-gray-500">Last Service</div><div className="font-medium">{viewCustomer.last_service_date || '-'}</div></div>
+                <div><div className="text-sm text-gray-500">Next Service</div><div className="font-medium">{viewCustomer.next_service_date || '-'}</div></div>
+                <div className="col-span-2"><div className="text-sm text-gray-500">Address</div><div className="font-medium">{viewCustomer.address || '-'}</div></div>
+              </div>
+            </Modal>
+          )}
+
+          {/* Delete Confirmation Modal */}
+          {showDeleteConfirm && (
+            <ConfirmModal 
+              title="Delete Customer"
+              message="Are you sure you want to delete this customer? This action cannot be undone."
+              onConfirm={confirmDelete}
+              onCancel={cancelDelete}
+            />
+          )}
+        </div>
+      );
+    }
+    // ------------------ end Customers ------------------
+
+    function Dashboard() {
+      const [stats, setStats] = useState(null);
+      useEffect(() => { (async () => { try { const d = await apiCall('/dashboard/stats'); setStats(d); } catch (e) { console.error(e); } })(); }, []);
+      return (
+        <div>
+          <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard title="Today's Sales" value={`₹${(stats?.today_sales ?? 0).toFixed(2)}`} icon="💰" color="bg-green-500" />
+            <StatCard title="Transactions" value={stats?.today_transactions ?? 0} icon="🛒" color="bg-blue-500" />
+            <StatCard title="Total Customers" value={stats?.total_customers ?? 0} icon="👥" color="bg-purple-500" />
+            <StatCard title="Low Stock Items" value={stats?.low_stock_items ?? 0} icon="⚠️" color="bg-red-500" />
+          </div>
+        </div>
+      );
+    }
+
+    // Products Component - Transaction-based inventory
+    function Products() {
+      const [products, setProducts] = useState([]);
+      const [filteredProducts, setFilteredProducts] = useState([]);
+      const [showForm, setShowForm] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const [showView, setShowView] = useState(false);
+      const [viewProduct, setViewProduct] = useState(null);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [rackFilter, setRackFilter] = useState('');
+      const [allRacks, setAllRacks] = useState([]);
+      const [showPurchase, setShowPurchase] = useState(false);
+      const [purchaseProduct, setPurchaseProduct] = useState(null);
+      const [showHistory, setShowHistory] = useState(false);
+      const [historyProduct, setHistoryProduct] = useState(null);
+      const [transactions, setTransactions] = useState([]);
+
+      const initialForm = {
+        name: '',
+        sell_price: '',
+        vendor: '',
+        rack_id: '',
+        additional_info: ''
+      };
+
+      const initialPurchaseForm = {
+        quantity: '',
+        unit_cost: '',
+        vendor: '',
+        reference_no: '',
+        notes: ''
+      };
+
+      const [form, setForm] = useState(initialForm);
+      const [purchaseForm, setPurchaseForm] = useState(initialPurchaseForm);
+
+      useEffect(() => { loadProducts(); }, []);
+
+      useEffect(() => {
+        filterProducts();
+      }, [products, searchTerm, rackFilter]);
+
+      const loadProducts = async () => {
+        try {
+          const data = await apiCall('/products');
+          setProducts(data);
+          
+          // Extract unique rack IDs
+          const racks = [...new Set(data.map(p => p.rack_id).filter(r => r))].sort();
+          setAllRacks(racks);
+        } catch (err) { console.error(err); }
+      };
+
+      const filterProducts = () => {
+        let filtered = products;
+
+        // Filter by search term (name, vendor)
+        if (searchTerm.trim()) {
+          const term = searchTerm.toLowerCase();
+          filtered = filtered.filter(p => 
+            p.name.toLowerCase().includes(term) || 
+            (p.vendor && p.vendor.toLowerCase().includes(term))
+          );
+        }
+
+        // Filter by rack
+        if (rackFilter) {
+          filtered = filtered.filter(p => p.rack_id === rackFilter);
+        }
+
+        setFilteredProducts(filtered);
+      };
+
+      const validateForm = () => {
+        if (!form.name.trim()) { alert('Product name is required'); return false; }
+        if (!form.sell_price || isNaN(form.sell_price) || parseFloat(form.sell_price) <= 0) {
+          alert('Sell price is required and must be a positive number'); return false;
+        }
+        if (!form.quantity || isNaN(form.quantity) || parseInt(form.quantity) < 0) {
+          alert('Quantity is required and must be a non-negative number'); return false;
+        }
+        if (!form.purchase_price || isNaN(form.purchase_price) || parseFloat(form.purchase_price) <= 0) {
+          alert('Purchase price is required and must be a positive number'); return false;
+        }
+        return true;
+      };
+
+      const openCreate = () => { setEditing(null); setForm(initialForm); setShowForm(true); };
+      const openEdit = (p) => {
+        setEditing(p);
+        setForm({
+          name: p.name ?? '',
+          sell_price: p.sell_price ?? '',
+          quantity: p.quantity ?? '',
+          purchase_price: p.purchase_price ?? '',
+          vendor: p.vendor ?? '',
+          rack_id: p.rack_id ?? '',
+          additional_info: p.additional_info ?? ''
+        });
+        setShowForm(true);
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!validateForm()) return;
+        try {
+          const payload = {
+            name: form.name,
+            sell_price: parseFloat(form.sell_price),
+            quantity: parseInt(form.quantity),
+            purchase_price: parseFloat(form.purchase_price),
+            vendor: form.vendor || null,
+            rack_id: form.rack_id || null,
+            additional_info: form.additional_info || null
+          };
+          if (editing) {
+            await apiCall(`/products/${editing.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+          } else {
+            await apiCall('/products', { method: 'POST', body: JSON.stringify(payload) });
+          }
+          setShowForm(false); setEditing(null); setForm(initialForm); loadProducts();
+        } catch (err) { alert(err.message); }
+      };
+
+      const handleDelete = async (id) => {
+        if (!confirm('Delete this product?')) return;
+        try { await apiCall(`/products/${id}`, { method: 'DELETE' }); loadProducts(); } catch (err) { alert(err.message); }
+      };
+
+      const handleView = (product) => { setViewProduct(product); setShowView(true); };
+
+      const calculateTotals = (product) => {
+        const totalPurchasePrice = parseFloat(product.purchase_price) * parseInt(product.quantity);
+        const expectedTotalSellPrice = parseFloat(product.sell_price) * parseInt(product.quantity);
+        const potentialProfit = expectedTotalSellPrice - totalPurchasePrice;
+        return { totalPurchasePrice, expectedTotalSellPrice, potentialProfit };
+      };
+
+      const clearFilters = () => {
+        setSearchTerm('');
+        setRackFilter('');
+      };
+
+      return (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-bold text-gray-800">Products & Inventory</h1>
+            <button onClick={openCreate} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Add Product</button>
+          </div>
+
+          {/* New System Banner */}
+          <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-lg p-4 mb-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-lg mb-1">✨ New: Advanced Stock Management Available!</h3>
+                <p className="text-sm">Track multiple purchases at different prices • Weighted average costing • Document management • Complete audit trail</p>
+              </div>
+              <a 
+                href="#" 
+                onClick={(e) => { e.preventDefault(); window.location.href = '/test.html'; }} 
+                className="bg-white text-blue-600 px-6 py-2 rounded-lg hover:bg-gray-100 font-bold whitespace-nowrap ml-4"
+              >
+                Open Stock Management →
+              </a>
+            </div>
+          </div>
+
+          {/* Search and Filter Bar */}
+          <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <div className="flex flex-wrap gap-4 items-end">
+              <div className="flex-1 min-w-[250px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search Products</label>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="Search by product name or vendor..."
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div className="min-w-[200px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Rack</label>
+                <select
+                  value={rackFilter}
+                  onChange={e => setRackFilter(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Racks</option>
+                  {allRacks.map(rack => (
+                    <option key={rack} value={rack}>{rack}</option>
+                  ))}
+                </select>
+              </div>
+
+              {(searchTerm || rackFilter) && (
+                <button
+                  onClick={clearFilters}
+                  className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                >
+                  Clear Filters
+                </button>
+              )}
+
+              <div className="text-sm text-gray-600 py-2">
+                Showing {filteredProducts.length} of {products.length} products
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="w-full overflow-x-auto">
+              <table className="min-w-[1100px] w-full table-auto">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Sell Price (₹)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Purchase Price (₹)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Purchase (₹)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expected Total Sell (₹)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack ID</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredProducts.map(p => {
+                    const { totalPurchasePrice, expectedTotalSellPrice } = calculateTotals(p);
+                    return (
+                      <tr key={p.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <button title="View" onClick={() => handleView(p)} className="text-gray-600 hover:text-gray-900">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7S3.732 16.057 2.458 12z" />
+                              </svg>
+                            </button>
+                            <button title="Edit" onClick={() => openEdit(p)} className="text-blue-600 hover:text-blue-800">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M17.414 2.586a2 2 0 010 2.828L8.414 14.414a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464L14.586 2.586a2 2 0 012.828 0z" />
+                              </svg>
+                            </button>
+                            <button title="Delete" onClick={() => handleDelete(p.id)} className="text-red-600 hover:text-red-800">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H3a1 1 0 100 2h14a1 1 0 100-2h-2V3a1 1 0 00-1-1H6zm2 6a1 1 0 10-2 0v7a1 1 0 102 0V8zm6 0a1 1 0 10-2 0v7a1 1 0 102 0V8z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap max-w-xs overflow-hidden text-ellipsis font-medium">{p.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">₹{parseFloat(p.sell_price).toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{p.quantity}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">₹{parseFloat(p.purchase_price).toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-orange-600">₹{totalPurchasePrice.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-green-600">₹{expectedTotalSellPrice.toFixed(2)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{p.vendor || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">{p.rack_id || '-'}</td>
+                      </tr>
+                    );
+                  })}
+                  {filteredProducts.length === 0 && (
+                    <tr>
+                      <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
+                        No products found. {searchTerm || rackFilter ? 'Try adjusting your filters.' : 'Add your first product to get started.'}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Create / Edit Modal */}
+          {showForm && (
+            <Modal onClose={() => { setShowForm(false); setEditing(null); }} wide={false}>
+              <h2 className="text-2xl font-bold mb-4">{editing ? 'Edit Product' : 'Add Product'}</h2>
+              <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium mb-1">Product Name *</label>
+                    <input type="text" value={form.name} onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Unit Sell Price (₹) *</label>
+                    <input type="number" step="0.01" min="0" value={form.sell_price} onChange={e => setForm(prev => ({ ...prev, sell_price: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Quantity *</label>
+                    <input type="number" min="0" value={form.quantity} onChange={e => setForm(prev => ({ ...prev, quantity: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Unit Purchase Price (₹) *</label>
+                    <input type="number" step="0.01" min="0" value={form.purchase_price} onChange={e => setForm(prev => ({ ...prev, purchase_price: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Vendor</label>
+                    <input type="text" value={form.vendor} onChange={e => setForm(prev => ({ ...prev, vendor: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium mb-1">Rack ID</label>
+                    <input type="text" value={form.rack_id} onChange={e => setForm(prev => ({ ...prev, rack_id: e.target.value }))} className="w-full px-3 py-2 border rounded" placeholder="e.g., A-1, B-2" />
+                  </div>
+
+                  {/* Show calculated totals if editing or if values entered */}
+                  {(form.sell_price && form.quantity && form.purchase_price) && (
+                    <div className="col-span-2 bg-gray-50 p-4 rounded-lg">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Calculated Values:</div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-gray-600">Total Purchase Price:</span>
+                          <span className="ml-2 font-medium text-orange-600">₹{(parseFloat(form.purchase_price || 0) * parseInt(form.quantity || 0)).toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Expected Total Sell Price:</span>
+                          <span className="ml-2 font-medium text-green-600">₹{(parseFloat(form.sell_price || 0) * parseInt(form.quantity || 0)).toFixed(2)}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Potential Profit:</span>
+                          <span className="ml-2 font-medium text-blue-600">₹{((parseFloat(form.sell_price || 0) * parseInt(form.quantity || 0)) - (parseFloat(form.purchase_price || 0) * parseInt(form.quantity || 0))).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium mb-1">Additional Info</label>
+                    <textarea value={form.additional_info} onChange={e => setForm(prev => ({ ...prev, additional_info: e.target.value }))} rows="3" className="w-full px-3 py-2 border rounded"></textarea>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-4">
+                  <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">{editing ? 'Update' : 'Create'}</button>
+                </div>
+              </form>
+            </Modal>
+          )}
+
+          {/* View modal */}
+          {showView && viewProduct && (
+            <Modal onClose={() => { setShowView(false); setViewProduct(null); }} wide={false}>
+              <h2 className="text-2xl font-bold mb-4">Product Details</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2"><div className="text-sm text-gray-500">Product Name</div><div className="font-medium text-lg">{viewProduct.name}</div></div>
+                
+                <div className="col-span-2 bg-blue-50 p-3 rounded">
+                  <div className="text-sm font-medium text-blue-800 mb-2">Pricing Information</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><div className="text-xs text-gray-600">Unit Sell Price</div><div className="font-medium">₹{parseFloat(viewProduct.sell_price).toFixed(2)}</div></div>
+                    <div><div className="text-xs text-gray-600">Quantity</div><div className="font-medium">{viewProduct.quantity}</div></div>
+                    <div><div className="text-xs text-gray-600">Unit Purchase Price</div><div className="font-medium">₹{parseFloat(viewProduct.purchase_price).toFixed(2)}</div></div>
+                  </div>
+                </div>
+
+                <div className="col-span-2 bg-green-50 p-3 rounded">
+                  <div className="text-sm font-medium text-green-800 mb-2">Total Values</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><div className="text-xs text-gray-600">Total Purchase Price</div><div className="font-medium text-orange-600">₹{calculateTotals(viewProduct).totalPurchasePrice.toFixed(2)}</div></div>
+                    <div><div className="text-xs text-gray-600">Expected Total Sell Price</div><div className="font-medium text-green-600">₹{calculateTotals(viewProduct).expectedTotalSellPrice.toFixed(2)}</div></div>
+                    <div className="col-span-2"><div className="text-xs text-gray-600">Potential Profit (Before Discount)</div><div className="font-medium text-blue-600">₹{calculateTotals(viewProduct).potentialProfit.toFixed(2)}</div></div>
+                  </div>
+                </div>
+
+                <div><div className="text-sm text-gray-500">Vendor</div><div className="font-medium">{viewProduct.vendor || '-'}</div></div>
+                <div><div className="text-sm text-gray-500">Rack ID</div><div className="font-medium">{viewProduct.rack_id || '-'}</div></div>
+                <div className="col-span-2"><div className="text-sm text-gray-500">Additional Info</div><div className="font-medium">{viewProduct.additional_info || '-'}</div></div>
+                
+                <div className="col-span-2 mt-2 p-3 bg-yellow-50 rounded">
+                  <div className="text-xs text-yellow-800">
+                    <strong>Note:</strong> Customer discounts can be applied during sales transactions. The expected total sell price shown is before any discounts.
+                  </div>
+                </div>
+              </div>
+            </Modal>
+          )}
+        </div>
+      );
+    }
+
+    function Services() {
+      return (
+        <div>
+          <h1 className="text-3xl font-bold mb-6">Recurring Services</h1>
+          <div className="bg-white rounded-lg p-6 shadow">Services list placeholder</div>
+        </div>
+      );
+    }
+
+    function Sales() {
+      return (
+        <div>
+          <h1 className="text-3xl font-bold mb-6">Sales & Billing</h1>
+          <div className="bg-white rounded-lg p-6 shadow">Sales list placeholder</div>
+        </div>
+      );
+    }
+
+    function StockManagement() {
+      const [products, setProducts] = useState([]);
+      const [selectedProduct, setSelectedProduct] = useState(null);
+      const [transactions, setTransactions] = useState([]);
+      const [showAddProduct, setShowAddProduct] = useState(false);
+      const [showAddPurchase, setShowAddPurchase] = useState(false);
+      const [showAdjustment, setShowAdjustment] = useState(false);
+      const [showUploadDoc, setShowUploadDoc] = useState(false);
+      const [uploadTransaction, setUploadTransaction] = useState(null);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [rackFilter, setRackFilter] = useState('');
+      const [allRacks, setAllRacks] = useState([]);
+
+      const [productForm, setProductForm] = useState({
+        name: '', sell_price: '', vendor: '', rack_id: '', additional_info: ''
+      });
+
+      const [purchaseForm, setPurchaseForm] = useState({
+        quantity: '', unit_cost: '', new_sell_price: '', vendor: '', reference_no: '', notes: ''
+      });
+
+      const [adjustmentForm, setAdjustmentForm] = useState({
+        type: 'ADJUSTMENT_OUT', quantity: '', reason: 'DEFECTED', notes: ''
+      });
+
+      const [uploadFile, setUploadFile] = useState(null);
+
+      useEffect(() => { loadProducts(); }, []);
+
+      const loadProducts = async () => {
+        try {
+          const data = await apiCall('/products');
+          setProducts(data);
+          const racks = [...new Set(data.map(p => p.rack_id).filter(r => r))].sort();
+          setAllRacks(racks);
+        } catch (err) { console.error(err); }
+      };
+
+      const loadTransactions = async (productId) => {
+        try {
+          const data = await apiCall(`/inventory-transactions/product/${productId}`);
+          setTransactions(data);
+        } catch (err) { console.error(err); }
+      };
+
+      const handleAddProduct = async (e) => {
+        e.preventDefault();
+        if (!productForm.name.trim()) { alert('Product name is required'); return; }
+        if (!productForm.sell_price || parseFloat(productForm.sell_price) <= 0) { alert('Valid sell price is required'); return; }
+        
+        try {
+          await apiCall('/products', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: productForm.name,
+              sell_price: parseFloat(productForm.sell_price),
+              vendor: productForm.vendor,
+              rack_id: productForm.rack_id,
+              additional_info: productForm.additional_info
+            })
+          });
+          setShowAddProduct(false);
+          setProductForm({ name: '', sell_price: '', vendor: '', rack_id: '', additional_info: '' });
+          loadProducts();
+        } catch (err) { alert(err.message); }
+      };
+
+      const handleAddPurchase = async (e) => {
+        e.preventDefault();
+        if (!purchaseForm.quantity || parseInt(purchaseForm.quantity) <= 0) { alert('Valid quantity is required'); return; }
+        if (!purchaseForm.unit_cost || parseFloat(purchaseForm.unit_cost) <= 0) { alert('Valid unit cost is required'); return; }
+        
+        try {
+          const requestData = {
+            product_id: selectedProduct.id,
+            transaction_type: 'PURCHASE',
+            quantity: parseInt(purchaseForm.quantity),
+            unit_cost: parseFloat(purchaseForm.unit_cost),
+            vendor: purchaseForm.vendor,
+            reference_no: purchaseForm.reference_no,
+            notes: purchaseForm.notes
+          };
+
+          // If new sell price provided, update product sell price
+          if (purchaseForm.new_sell_price && parseFloat(purchaseForm.new_sell_price) > 0) {
+            await apiCall(`/products/${selectedProduct.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                ...selectedProduct,
+                sell_price: parseFloat(purchaseForm.new_sell_price)
+              })
+            });
+          }
+
+          const result = await apiCall('/inventory-transactions', {
+            method: 'POST',
+            body: JSON.stringify(requestData)
+          });
+
+          setShowAddPurchase(false);
+          setPurchaseForm({ quantity: '', unit_cost: '', new_sell_price: '', vendor: '', reference_no: '', notes: '' });
+          
+          // Reload product to get updated values
+          const updatedProduct = await apiCall(`/products/${selectedProduct.id}`);
+          setSelectedProduct(updatedProduct);
+          await loadTransactions(selectedProduct.id);
+          loadProducts();
+        } catch (err) { alert(err.message); }
+      };
+
+      const handleAdjustment = async (e) => {
+        e.preventDefault();
+        if (!adjustmentForm.quantity || parseInt(adjustmentForm.quantity) <= 0) { alert('Valid quantity is required'); return; }
+        
+        try {
+          await apiCall('/inventory-transactions', {
+            method: 'POST',
+            body: JSON.stringify({
+              product_id: selectedProduct.id,
+              transaction_type: adjustmentForm.type,
+              quantity: parseInt(adjustmentForm.quantity),
+              notes: `${adjustmentForm.reason}: ${adjustmentForm.notes}`
+            })
+          });
+          setShowAdjustment(false);
+          setAdjustmentForm({ type: 'ADJUSTMENT_OUT', quantity: '', reason: 'DEFECTED', notes: '' });
+          
+          const updatedProduct = await apiCall(`/products/${selectedProduct.id}`);
+          setSelectedProduct(updatedProduct);
+          await loadTransactions(selectedProduct.id);
+          loadProducts();
+        } catch (err) { alert(err.message); }
+      };
+
+      const handleFileUpload = async (e) => {
+        e.preventDefault();
+        if (!uploadFile) { alert('Please select a file'); return; }
+
+        const formData = new FormData();
+        formData.append('document', uploadFile);
+        formData.append('transaction_id', uploadTransaction.id);
+
+        try {
+          const res = await fetch(`${API_URL}/inventory-transactions/${uploadTransaction.id}/upload`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+            body: formData
+          });
+
+          if (!res.ok) throw new Error('Upload failed');
+
+          alert('Document uploaded successfully!');
+          setShowUploadDoc(false);
+          setUploadFile(null);
+          setUploadTransaction(null);
+          await loadTransactions(selectedProduct.id);
+        } catch (err) { alert(err.message); }
+      };
+
+      const openProductDetails = async (product) => {
+        setSelectedProduct(product);
+        await loadTransactions(product.id);
+      };
+
+      const filteredProducts = products.filter(p => {
+        const matchesSearch = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             (p.vendor && p.vendor.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesRack = !rackFilter || p.rack_id === rackFilter;
+        return matchesSearch && matchesRack;
+      });
+
+      if (selectedProduct) {
+        const totalSell = selectedProduct.quantity * selectedProduct.sell_price;
+        const totalCost = selectedProduct.quantity * selectedProduct.purchase_price;
+        const margin = totalSell - totalCost;
+        const marginPerUnit = selectedProduct.sell_price - selectedProduct.purchase_price;
+
+        return (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <button onClick={() => setSelectedProduct(null)} className="text-blue-600 hover:text-blue-800 flex items-center gap-2">
+                <span>←</span> Back to Products
+              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setShowAddPurchase(true)} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">+ Add Purchase</button>
+                <button onClick={() => setShowAdjustment(true)} className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700">⚠ Adjust Stock</button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <h1 className="text-2xl font-bold text-gray-800 mb-2">{selectedProduct.name}</h1>
+              <p className="text-gray-600 mb-4">Vendor: {selectedProduct.vendor || 'N/A'} | Rack: {selectedProduct.rack_id || 'N/A'}</p>
+
+              <div className="grid grid-cols-4 gap-4 mb-4">
+                <div className="bg-blue-50 p-4 rounded">
+                  <div className="text-sm text-gray-600">Current Stock</div>
+                  <div className="text-2xl font-bold text-blue-600">{selectedProduct.quantity} units</div>
+                </div>
+                <div className="bg-green-50 p-4 rounded">
+                  <div className="text-sm text-gray-600">Unit Sell Price</div>
+                  <div className="text-2xl font-bold text-green-600">₹{selectedProduct.sell_price}</div>
+                </div>
+                <div className="bg-purple-50 p-4 rounded">
+                  <div className="text-sm text-gray-600">Avg Unit Cost</div>
+                  <div className="text-2xl font-bold text-purple-600">₹{selectedProduct.purchase_price.toFixed(2)}</div>
+                </div>
+                <div className="bg-yellow-50 p-4 rounded">
+                  <div className="text-sm text-gray-600">Unit Margin</div>
+                  <div className="text-2xl font-bold text-yellow-600">₹{marginPerUnit.toFixed(2)}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                <div>
+                  <div className="text-sm text-gray-600">Total Purchase Price</div>
+                  <div className="text-xl font-bold text-gray-800">₹{totalCost.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">Expected Total Sell</div>
+                  <div className="text-xl font-bold text-gray-800">₹{totalSell.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-600">Total Margin</div>
+                  <div className="text-xl font-bold text-green-600">₹{margin.toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-6 border-b">
+                <h2 className="text-xl font-bold">Transaction History</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Document</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {transactions.length === 0 ? (
+                      <tr>
+                        <td colSpan="10" className="px-6 py-8 text-center text-gray-500">
+                          No transactions yet. Add your first purchase!
+                        </td>
+                      </tr>
+                    ) : (
+                      transactions.map(t => (
+                        <tr key={t.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm font-mono text-gray-600">#{t.id}</td>
+                          <td className="px-6 py-4 text-sm">{new Date(t.transaction_date).toLocaleString()}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 text-xs rounded ${
+                              t.transaction_type === 'PURCHASE' ? 'bg-green-100 text-green-800' :
+                              t.transaction_type === 'SALE' ? 'bg-blue-100 text-blue-800' :
+                              'bg-orange-100 text-orange-800'
+                            }`}>
+                              {t.transaction_type}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium">{t.quantity}</td>
+                          <td className="px-6 py-4 text-sm">{t.unit_cost ? `₹${t.unit_cost}` : '-'}</td>
+                          <td className="px-6 py-4 text-sm font-medium">{t.unit_cost ? `₹${(t.quantity * t.unit_cost).toFixed(2)}` : '-'}</td>
+                          <td className="px-6 py-4 text-sm">{t.vendor || '-'}</td>
+                          <td className="px-6 py-4 text-sm">{t.reference_no || '-'}</td>
+                          <td className="px-6 py-4 text-sm">
+                            {t.document_path ? (
+                              <a href={`${API_URL}${t.document_path}`} target="_blank" className="text-blue-600 hover:underline">View</a>
+                            ) : (
+                              <button onClick={() => { setUploadTransaction(t); setShowUploadDoc(true); }} className="text-blue-600 hover:underline">Upload</button>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-600">{t.notes || '-'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {showAddPurchase && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                  <div className="p-6 border-b">
+                    <h3 className="text-xl font-bold">Add Purchase</h3>
+                    <p className="text-sm text-gray-600 mt-1">Add stock for {selectedProduct.name}</p>
+                  </div>
+                  <form onSubmit={handleAddPurchase} className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Quantity *</label>
+                        <input type="number" value={purchaseForm.quantity} onChange={e => setPurchaseForm({...purchaseForm, quantity: e.target.value})} className="w-full px-3 py-2 border rounded" required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Unit Cost (₹) *</label>
+                        <input type="number" step="0.01" value={purchaseForm.unit_cost} onChange={e => setPurchaseForm({...purchaseForm, unit_cost: e.target.value})} className="w-full px-3 py-2 border rounded" required />
+                      </div>
+                      <div className="bg-yellow-50 p-3 rounded">
+                        <label className="block text-sm font-medium mb-1">New Sell Price (₹) - Optional</label>
+                        <input type="number" step="0.01" value={purchaseForm.new_sell_price} onChange={e => setPurchaseForm({...purchaseForm, new_sell_price: e.target.value})} className="w-full px-3 py-2 border rounded" placeholder={`Current: ₹${selectedProduct.sell_price}`} />
+                        <p className="text-xs text-gray-600 mt-1">Leave empty to keep current price</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Vendor</label>
+                        <input value={purchaseForm.vendor} onChange={e => setPurchaseForm({...purchaseForm, vendor: e.target.value})} className="w-full px-3 py-2 border rounded" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Invoice/Reference No</label>
+                        <input value={purchaseForm.reference_no} onChange={e => setPurchaseForm({...purchaseForm, reference_no: e.target.value})} className="w-full px-3 py-2 border rounded" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Notes</label>
+                        <textarea value={purchaseForm.notes} onChange={e => setPurchaseForm({...purchaseForm, notes: e.target.value})} className="w-full px-3 py-2 border rounded" rows="2"></textarea>
+                      </div>
+                      {purchaseForm.quantity && purchaseForm.unit_cost && (
+                        <div className="bg-blue-50 p-3 rounded">
+                          <div className="text-sm font-medium">Total Purchase: ₹{(parseInt(purchaseForm.quantity) * parseFloat(purchaseForm.unit_cost)).toFixed(2)}</div>
+                          {purchaseForm.new_sell_price && (
+                            <div className="text-sm text-green-600 mt-1">New margin per unit: ₹{(parseFloat(purchaseForm.new_sell_price) - parseFloat(purchaseForm.unit_cost)).toFixed(2)}</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-3 mt-6">
+                      <button type="button" onClick={() => setShowAddPurchase(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
+                      <button type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Add Purchase</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {showAdjustment && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                  <div className="p-6 border-b">
+                    <h3 className="text-xl font-bold">Stock Adjustment</h3>
+                  </div>
+                  <form onSubmit={handleAdjustment} className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Adjustment Type *</label>
+                        <select value={adjustmentForm.type} onChange={e => setAdjustmentForm({...adjustmentForm, type: e.target.value})} className="w-full px-3 py-2 border rounded">
+                          <option value="ADJUSTMENT_OUT">Decrease Stock (OUT)</option>
+                          <option value="ADJUSTMENT_IN">Increase Stock (IN)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Quantity *</label>
+                        <input type="number" value={adjustmentForm.quantity} onChange={e => setAdjustmentForm({...adjustmentForm, quantity: e.target.value})} className="w-full px-3 py-2 border rounded" required />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Reason *</label>
+                        <select value={adjustmentForm.reason} onChange={e => setAdjustmentForm({...adjustmentForm, reason: e.target.value})} className="w-full px-3 py-2 border rounded">
+                          <option value="DEFECTED">Defected</option>
+                          <option value="RETURNED">Returned by Customer</option>
+                          <option value="DAMAGED">Damaged</option>
+                          <option value="LOST">Lost/Stolen</option>
+                          <option value="EXPIRED">Expired</option>
+                          <option value="FOUND">Found (Extra Stock)</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Additional Notes</label>
+                        <textarea value={adjustmentForm.notes} onChange={e => setAdjustmentForm({...adjustmentForm, notes: e.target.value})} className="w-full px-3 py-2 border rounded" rows="2" placeholder="Describe the reason..."></textarea>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 mt-6">
+                      <button type="button" onClick={() => setShowAdjustment(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
+                      <button type="submit" className="flex-1 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">Adjust Stock</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {showUploadDoc && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                  <div className="p-6 border-b">
+                    <h3 className="text-xl font-bold">Upload Document</h3>
+                    <p className="text-sm text-gray-600 mt-1">Transaction #{uploadTransaction?.id}</p>
+                  </div>
+                  <form onSubmit={handleFileUpload} className="p-6">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Select Document *</label>
+                        <input type="file" onChange={e => setUploadFile(e.target.files[0])} className="w-full px-3 py-2 border rounded" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required />
+                        <p className="text-xs text-gray-600 mt-1">Supported: PDF, JPG, PNG, DOC, DOCX</p>
+                      </div>
+                      {uploadFile && (
+                        <div className="bg-blue-50 p-3 rounded text-sm">
+                          <div className="font-medium">Selected: {uploadFile.name}</div>
+                          <div className="text-gray-600">Size: {(uploadFile.size / 1024).toFixed(2)} KB</div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-3 mt-6">
+                      <button type="button" onClick={() => { setShowUploadDoc(false); setUploadFile(null); setUploadTransaction(null); }} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
+                      <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Upload</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      return (
+        <div>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-800">Stock Management</h1>
+            <button onClick={() => setShowAddProduct(true)} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">+ Add Product</button>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-4 mb-6">
+            <div className="flex gap-4">
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="flex-1 px-4 py-2 border rounded-lg"
+              />
+              <select value={rackFilter} onChange={e => setRackFilter(e.target.value)} className="px-4 py-2 border rounded-lg">
+                <option value="">All Racks</option>
+                {allRacks.map(rack => <option key={rack} value={rack}>{rack}</option>)}
+              </select>
+              {(searchTerm || rackFilter) && (
+                <button onClick={() => { setSearchTerm(''); setRackFilter(''); }} className="px-4 py-2 text-gray-600 hover:text-gray-800">
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sell Price (₹)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Cost (₹)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                      {products.length === 0 ? (
+                        <div>
+                          <p className="text-lg font-medium mb-2">No products yet</p>
+                          <p className="text-sm">Click "Add Product" to get started</p>
+                        </div>
+                      ) : (
+                        <div>No products match your search</div>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProducts.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openProductDetails(p)}>
+                      <td className="px-6 py-4 font-medium text-blue-600">{p.name}</td>
+                      <td className="px-6 py-4">
+                        <span className={`font-bold ${p.quantity === 0 ? 'text-red-600' : p.quantity < 10 ? 'text-orange-600' : 'text-green-600'}`}>
+                          {p.quantity}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">₹{p.sell_price}</td>
+                      <td className="px-6 py-4">₹{p.purchase_price.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-gray-600">{p.vendor || '-'}</td>
+                      <td className="px-6 py-4 text-gray-600">{p.rack_id || '-'}</td>
+                      <td className="px-6 py-4">
+                        <button onClick={(e) => { e.stopPropagation(); openProductDetails(p); }} className="text-blue-600 hover:text-blue-800">
+                          View Details →
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 text-sm text-gray-600">
+            Showing {filteredProducts.length} of {products.length} products
+          </div>
+
+          {showAddProduct && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div className="p-6 border-b">
+                  <h3 className="text-xl font-bold">Add New Product</h3>
+                  <p className="text-sm text-gray-600 mt-1">Stock will be added through purchase transactions</p>
+                </div>
+                <form onSubmit={handleAddProduct} className="p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Product Name *</label>
+                      <input value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} className="w-full px-3 py-2 border rounded" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Sell Price (₹) *</label>
+                      <input type="number" step="0.01" value={productForm.sell_price} onChange={e => setProductForm({...productForm, sell_price: e.target.value})} className="w-full px-3 py-2 border rounded" required />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Vendor</label>
+                      <input value={productForm.vendor} onChange={e => setProductForm({...productForm, vendor: e.target.value})} className="w-full px-3 py-2 border rounded" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Rack ID</label>
+                      <input value={productForm.rack_id} onChange={e => setProductForm({...productForm, rack_id: e.target.value})} className="w-full px-3 py-2 border rounded" placeholder="e.g., A-1, B-2" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Additional Info</label>
+                      <textarea value={productForm.additional_info} onChange={e => setProductForm({...productForm, additional_info: e.target.value})} className="w-full px-3 py-2 border rounded" rows="2"></textarea>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 mt-6">
+                    <button type="button" onClick={() => setShowAddProduct(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
+                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Product</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function JobCards() {
+      const [jobCards, setJobCards] = useState([]);
+      const [filteredJobCards, setFilteredJobCards] = useState([]);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [statusFilter, setStatusFilter] = useState('');
+      const [showCreateModal, setShowCreateModal] = useState(false);
+      const [showViewModal, setShowViewModal] = useState(false);
+      const [showAddStockModal, setShowAddStockModal] = useState(false);
+      const [showBillingModal, setShowBillingModal] = useState(false);
+      const [showRejectModal, setShowRejectModal] = useState(false);
+      const [currentJobCard, setCurrentJobCard] = useState(null);
+      const [products, setProducts] = useState([]);
+      
+      // Create job card form states
+      const [customerSearch, setCustomerSearch] = useState('');
+      const [customerResults, setCustomerResults] = useState([]);
+      const [selectedCustomer, setSelectedCustomer] = useState(null);
+      const [vehicleNumber, setVehicleNumber] = useState('');
+      const [tasks, setTasks] = useState(['']);
+      const [assignee, setAssignee] = useState('');
+      const [notes, setNotes] = useState('');
+      
+      // Stock item form states
+      const [stockProductId, setStockProductId] = useState('');
+      const [stockQuantity, setStockQuantity] = useState(1);
+      const [stockUnitPrice, setStockUnitPrice] = useState(0);
+      const [stockNotes, setStockNotes] = useState('');
+      
+      // Billing form states
+      const [labourCharge, setLabourCharge] = useState(0);
+      const [lastServiceDate, setLastServiceDate] = useState('');
+      const [nextServiceDate, setNextServiceDate] = useState('');
+      
+      // Reject form state
+      const [rejectReason, setRejectReason] = useState('');
+
+      useEffect(() => {
+        loadJobCards();
+        loadProducts();
+      }, []);
+
+      useEffect(() => {
+        filterJobCards();
+      }, [jobCards, searchTerm, statusFilter]);
+
+      const loadJobCards = async () => {
+        try {
+          const response = await fetch(`${API_URL}/job-cards`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          const data = await response.json();
+          setJobCards(data);
+        } catch (error) {
+          console.error('Error loading job cards:', error);
+        }
+      };
+
+      const loadProducts = async () => {
+        try {
+          const response = await fetch(`${API_URL}/products`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          const data = await response.json();
+          setProducts(data);
+        } catch (error) {
+          console.error('Error loading products:', error);
+        }
+      };
+
+      const filterJobCards = () => {
+        let filtered = [...jobCards];
+        
+        if (searchTerm) {
+          filtered = filtered.filter(job => 
+            job.job_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            job.vehicle_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            job.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        }
+        
+        if (statusFilter) {
+          filtered = filtered.filter(job => job.status === statusFilter);
+        }
+        
+        setFilteredJobCards(filtered);
+      };
+
+      const searchCustomers = async (search) => {
+        if (search.length < 2) {
+          setCustomerResults([]);
+          return;
+        }
+        
+        try {
+          const response = await fetch(`${API_URL}/job-cards/search-customer?search=${encodeURIComponent(search)}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          const data = await response.json();
+          setCustomerResults(data);
+        } catch (error) {
+          console.error('Error searching customers:', error);
+        }
+      };
+
+      const handleCustomerSearch = (value) => {
+        setCustomerSearch(value);
+        searchCustomers(value);
+      };
+
+      const selectCustomer = (customer) => {
+        setSelectedCustomer(customer);
+        setCustomerSearch(customer.name);
+        setVehicleNumber(customer.vehicle_number || '');
+        setCustomerResults([]);
+      };
+
+      const createJobCard = async () => {
+        if (!selectedCustomer) {
+          alert('Please select a customer');
+          return;
+        }
+        
+        if (!vehicleNumber) {
+          alert('Please enter vehicle number');
+          return;
+        }
+        
+        const validTasks = tasks.filter(t => t.trim().length > 0);
+        if (validTasks.length === 0) {
+          alert('Please add at least one task');
+          return;
+        }
+        
+        try {
+          const response = await fetch(`${API_URL}/job-cards`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              customer_id: selectedCustomer.id,
+              vehicle_number: vehicleNumber,
+              tasks: validTasks,
+              assignee: assignee || null,
+              notes: notes || null
+            })
+          });
+          
+          const data = await response.json();
+          if (data.error) {
+            alert(data.error);
+          } else {
+            closeCreateModal();
+            loadJobCards();
+          }
+        } catch (error) {
+          console.error('Error creating job card:', error);
+          alert('Failed to create job card');
+        }
+      };
+
+      const viewJobCard = async (id) => {
+        try {
+          const response = await fetch(`${API_URL}/job-cards/${id}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          const data = await response.json();
+          setCurrentJobCard(data);
+          setShowViewModal(true);
+        } catch (error) {
+          console.error('Error loading job card:', error);
+        }
+      };
+
+      const addStockItem = async () => {
+        if (!stockProductId || !stockQuantity || !stockUnitPrice) {
+          alert('Please fill all required fields');
+          return;
+        }
+        
+        try {
+          const response = await fetch(`${API_URL}/job-cards/${currentJobCard.id}/stock-items`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              product_id: stockProductId,
+              quantity: stockQuantity,
+              unit_price: stockUnitPrice,
+              notes: stockNotes || null
+            })
+          });
+          
+          const data = await response.json();
+          if (data.error) {
+            alert(data.error);
+          } else {
+            setShowAddStockModal(false);
+            resetStockForm();
+            viewJobCard(currentJobCard.id);
+          }
+        } catch (error) {
+          console.error('Error adding stock item:', error);
+          alert('Failed to add stock item');
+        }
+      };
+
+      const completeJobCard = async () => {
+        try {
+          const response = await fetch(`${API_URL}/job-cards/${currentJobCard.id}/complete`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              labour_charge: labourCharge,
+              last_service_date: lastServiceDate || null,
+              next_service_date: nextServiceDate || null
+            })
+          });
+          
+          const data = await response.json();
+          if (data.error) {
+            alert(data.error);
+          } else {
+            setShowBillingModal(false);
+            setShowViewModal(false);
+            loadJobCards();
+          }
+        } catch (error) {
+          console.error('Error completing job card:', error);
+          alert('Failed to complete job card');
+        }
+      };
+
+      const rejectJobCard = async () => {
+        if (!rejectReason.trim()) {
+          alert('Please enter rejection reason');
+          return;
+        }
+        
+        try {
+          const response = await fetch(`${API_URL}/job-cards/${currentJobCard.id}/reject`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ reason: rejectReason })
+          });
+          
+          const data = await response.json();
+          if (data.error) {
+            alert(data.error);
+          } else {
+            setShowRejectModal(false);
+            setShowViewModal(false);
+            loadJobCards();
+          }
+        } catch (error) {
+          console.error('Error rejecting job card:', error);
+          alert('Failed to reject job card');
+        }
+      };
+
+      const printJobCard = () => {
+        if (!currentJobCard) return;
+        
+        const stockTotal = currentJobCard.stock_items.reduce((sum, item) => sum + item.total_price, 0);
+        const jobLabourCharge = currentJobCard.labour_charge || labourCharge || 0;
+        const grandTotal = stockTotal + parseFloat(jobLabourCharge);
+        
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Job Card - ${currentJobCard.job_number}</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h1 { text-align: center; color: #333; }
+                .header { margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+                .info-item { margin-bottom: 10px; }
+                .info-item strong { display: block; color: #666; font-size: 12px; }
+                .info-item span { font-size: 16px; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+                th { background: #f5f5f5; font-weight: bold; }
+                .total-row { font-weight: bold; background: #f9f9f9; }
+                .tasks { margin: 20px 0; }
+                .task-item { padding: 8px; background: #f9f9f9; margin: 5px 0; border-left: 3px solid #667eea; }
+                .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; }
+                @media print {
+                  button { display: none; }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1>🔧 Job Card</h1>
+                <p style="text-align: center; color: #666;">${currentJobCard.job_number}</p>
+              </div>
+              
+              <div class="info-grid">
+                <div class="info-item">
+                  <strong>Customer</strong>
+                  <span>${currentJobCard.customer_name}</span>
+                </div>
+                <div class="info-item">
+                  <strong>Vehicle Number</strong>
+                  <span>${currentJobCard.vehicle_number}</span>
+                </div>
+                <div class="info-item">
+                  <strong>Status</strong>
+                  <span style="text-transform: uppercase;">${currentJobCard.status}</span>
+                </div>
+                <div class="info-item">
+                  <strong>Assignee</strong>
+                  <span>${currentJobCard.assignee || 'Not assigned'}</span>
+                </div>
+                <div class="info-item">
+                  <strong>Created Date</strong>
+                  <span>${new Date(currentJobCard.created_at).toLocaleString()}</span>
+                </div>
+                ${currentJobCard.closed_at ? `
+                  <div class="info-item">
+                    <strong>Closed Date</strong>
+                    <span>${new Date(currentJobCard.closed_at).toLocaleString()}</span>
+                  </div>
+                ` : ''}
+              </div>
+              
+              ${currentJobCard.notes ? `
+                <div style="margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 5px;">
+                  <strong>Notes:</strong>
+                  <p style="margin: 5px 0 0 0;">${currentJobCard.notes}</p>
+                </div>
+              ` : ''}
+              
+              <h3>Tasks</h3>
+              <div class="tasks">
+                ${currentJobCard.tasks.map(task => `
+                  <div class="task-item">${task.task_description}</div>
+                `).join('')}
+              </div>
+              
+              <h3>Stock Items & Parts</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${currentJobCard.stock_items.map(item => `
+                    <tr>
+                      <td>${item.product_name}</td>
+                      <td>${item.quantity}</td>
+                      <td>₹${item.unit_price.toFixed(2)}</td>
+                      <td>₹${item.total_price.toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                  <tr class="total-row">
+                    <td colspan="3">Parts Subtotal</td>
+                    <td>₹${stockTotal.toFixed(2)}</td>
+                  </tr>
+                  <tr class="total-row">
+                    <td colspan="3">Labour Charges</td>
+                    <td>₹${parseFloat(jobLabourCharge).toFixed(2)}</td>
+                  </tr>
+                  <tr class="total-row" style="font-size: 18px;">
+                    <td colspan="3">GRAND TOTAL</td>
+                    <td>₹${grandTotal.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              
+              <div class="footer">
+                <p>Thank you for your business!</p>
+                <p>Generated on ${new Date().toLocaleString()}</p>
+              </div>
+              
+              <div style="text-align: center; margin: 20px;">
+                <button onclick="window.print()" style="padding: 10px 30px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">Print</button>
+                <button onclick="window.close()" style="padding: 10px 30px; background: #6b7280; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-left: 10px;">Close</button>
+              </div>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      };
+
+      const closeCreateModal = () => {
+        setShowCreateModal(false);
+        setCustomerSearch('');
+        setSelectedCustomer(null);
+        setVehicleNumber('');
+        setTasks(['']);
+        setAssignee('');
+        setNotes('');
+        setCustomerResults([]);
+      };
+
+      const resetStockForm = () => {
+        setStockProductId('');
+        setStockQuantity(1);
+        setStockUnitPrice(0);
+        setStockNotes('');
+      };
+
+      return (
+        <div className="p-6">
+          <h1 className="text-3xl font-bold text-gray-800 mb-6">🔧 Job Cards Management</h1>
+          
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="flex gap-4 items-center flex-wrap">
+              <input
+                type="text"
+                placeholder="Search by job number, vehicle, customer..."
+                className="flex-1 min-w-[300px] px-4 py-2 border rounded-lg"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <select
+                className="px-4 py-2 border rounded-lg"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">All Status</option>
+                <option value="open">Open</option>
+                <option value="closed">Closed</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                + Create Job Card
+              </button>
+            </div>
+          </div>
+
+          {filteredJobCards.length === 0 ? (
+            <div className="text-center py-20 text-gray-500">
+              <div className="text-6xl mb-4">📋</div>
+              <h3 className="text-xl font-semibold mb-2">No job cards found</h3>
+              <p>Create your first job card to get started</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredJobCards.map(job => (
+                <div
+                  key={job.id}
+                  className={`bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition border-l-4 ${
+                    job.status === 'open' ? 'border-green-500' :
+                    job.status === 'closed' ? 'border-gray-500' : 'border-red-500'
+                  }`}
+                  onClick={() => viewJobCard(job.id)}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="text-lg font-bold text-blue-600">{job.job_number}</div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${
+                      job.status === 'open' ? 'bg-green-100 text-green-800' :
+                      job.status === 'closed' ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {job.status}
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <strong className="text-gray-600">Customer:</strong>
+                      <div>{job.customer_name}</div>
+                    </div>
+                    <div>
+                      <strong className="text-gray-600">Vehicle:</strong>
+                      <div>{job.vehicle_number}</div>
+                    </div>
+                    {job.assignee && (
+                      <div>
+                        <strong className="text-gray-600">Assignee:</strong>
+                        <div>{job.assignee}</div>
+                      </div>
+                    )}
+                    <div>
+                      <strong className="text-gray-600">Created:</strong>
+                      <div>{new Date(job.created_at).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Create Job Card Modal */}
+          {showCreateModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 border-b flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Create New Job Card</h2>
+                  <button onClick={closeCreateModal} className="text-2xl text-gray-500 hover:text-red-600">×</button>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block font-semibold mb-2">Search Customer *</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search by name, phone, email, or vehicle number..."
+                          className="w-full px-4 py-2 border rounded-lg"
+                          value={customerSearch}
+                          onChange={(e) => handleCustomerSearch(e.target.value)}
+                        />
+                        {customerResults.length > 0 && (
+                          <div className="absolute z-10 w-full bg-white border rounded-lg mt-1 max-h-60 overflow-y-auto shadow-lg">
+                            {customerResults.map(customer => (
+                              <div
+                                key={customer.id}
+                                className="p-3 hover:bg-gray-100 cursor-pointer border-b"
+                                onClick={() => selectCustomer(customer)}
+                              >
+                                <div className="font-semibold">{customer.name}</div>
+                                <div className="text-sm text-gray-600">
+                                  {customer.phone} {customer.vehicle_number && `• ${customer.vehicle_number}`}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {selectedCustomer && (
+                        <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                          <div className="font-semibold">{selectedCustomer.name}</div>
+                          <div className="text-sm text-gray-600">{selectedCustomer.phone}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-2">Vehicle Number *</label>
+                      <input
+                        type="text"
+                        placeholder="Enter vehicle number"
+                        className="w-full px-4 py-2 border rounded-lg"
+                        value={vehicleNumber}
+                        onChange={(e) => setVehicleNumber(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-2">Tasks/Requirements *</label>
+                      {tasks.map((task, index) => (
+                        <div key={index} className="flex gap-2 mb-2">
+                          <input
+                            type="text"
+                            placeholder="e.g., Change engine oil"
+                            className="flex-1 px-4 py-2 border rounded-lg"
+                            value={task}
+                            onChange={(e) => {
+                              const newTasks = [...tasks];
+                              newTasks[index] = e.target.value;
+                              setTasks(newTasks);
+                            }}
+                          />
+                          {tasks.length > 1 && (
+                            <button
+                              onClick={() => setTasks(tasks.filter((_, i) => i !== index))}
+                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setTasks([...tasks, ''])}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                      >
+                        + Add Task
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-2">Assignee</label>
+                      <input
+                        type="text"
+                        placeholder="Person responsible for this job"
+                        className="w-full px-4 py-2 border rounded-lg"
+                        value={assignee}
+                        onChange={(e) => setAssignee(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-2">Notes</label>
+                      <textarea
+                        placeholder="Additional notes or instructions..."
+                        className="w-full px-4 py-2 border rounded-lg"
+                        rows="3"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 mt-6">
+                    <button
+                      onClick={createJobCard}
+                      className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                    >
+                      Create Job Card
+                    </button>
+                    <button
+                      onClick={closeCreateModal}
+                      className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* View Job Card Modal */}
+          {showViewModal && currentJobCard && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 border-b flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">{currentJobCard.job_number}</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={printJobCard}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    >
+                      🖨️ Print
+                    </button>
+                    <button onClick={() => setShowViewModal(false)} className="text-2xl text-gray-500 hover:text-red-600">×</button>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600">Status</div>
+                      <div className={`text-lg font-semibold uppercase ${
+                        currentJobCard.status === 'open' ? 'text-green-600' :
+                        currentJobCard.status === 'closed' ? 'text-gray-600' : 'text-red-600'
+                      }`}>
+                        {currentJobCard.status}
+                      </div>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600">Customer</div>
+                      <div className="text-lg font-semibold">{currentJobCard.customer_name}</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600">Vehicle</div>
+                      <div className="text-lg font-semibold">{currentJobCard.vehicle_number}</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600">Assignee</div>
+                      <div className="text-lg font-semibold">{currentJobCard.assignee || 'Not assigned'}</div>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600">Created</div>
+                      <div className="text-lg font-semibold">{new Date(currentJobCard.created_at).toLocaleString()}</div>
+                    </div>
+                    {currentJobCard.closed_at && (
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-600">Closed</div>
+                        <div className="text-lg font-semibold">{new Date(currentJobCard.closed_at).toLocaleString()}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {currentJobCard.notes && (
+                    <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
+                      <div className="font-semibold mb-2">Notes:</div>
+                      <div>{currentJobCard.notes}</div>
+                    </div>
+                  )}
+
+                  <div className="mb-6">
+                    <h3 className="text-xl font-bold mb-3">Tasks</h3>
+                    <div className="space-y-2">
+                      {currentJobCard.tasks.map((task, index) => (
+                        <div key={index} className="p-3 bg-gray-50 rounded-lg border-l-4 border-blue-500">
+                          {task.task_description}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-xl font-bold">Stock Items & Parts</h3>
+                      {currentJobCard.status === 'open' && (
+                        <button
+                          onClick={() => setShowAddStockModal(true)}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        >
+                          + Add Stock
+                        </button>
+                      )}
+                    </div>
+                    {currentJobCard.stock_items.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-gray-100">
+                              <th className="border p-3 text-left">Product</th>
+                              <th className="border p-3 text-right">Quantity</th>
+                              <th className="border p-3 text-right">Unit Price</th>
+                              <th className="border p-3 text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentJobCard.stock_items.map((item, index) => (
+                              <tr key={index}>
+                                <td className="border p-3">{item.product_name}</td>
+                                <td className="border p-3 text-right">{item.quantity}</td>
+                                <td className="border p-3 text-right">₹{item.unit_price.toFixed(2)}</td>
+                                <td className="border p-3 text-right">₹{item.total_price.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                            <tr className="font-bold bg-gray-50">
+                              <td colSpan="3" className="border p-3 text-right">Subtotal</td>
+                              <td className="border p-3 text-right">
+                                ₹{currentJobCard.stock_items.reduce((sum, item) => sum + item.total_price, 0).toFixed(2)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">No stock items added yet</div>
+                    )}
+                  </div>
+
+                  {currentJobCard.status === 'open' && (
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => setShowBillingModal(true)}
+                        className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                      >
+                        Complete & Bill
+                      </button>
+                      <button
+                        onClick={() => setShowRejectModal(true)}
+                        className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Stock Modal */}
+          {showAddStockModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg max-w-md w-full">
+                <div className="p-6 border-b flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Add Stock Item</h2>
+                  <button onClick={() => { setShowAddStockModal(false); resetStockForm(); }} className="text-2xl text-gray-500 hover:text-red-600">×</button>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block font-semibold mb-2">Product *</label>
+                      <select
+                        className="w-full px-4 py-2 border rounded-lg"
+                        value={stockProductId}
+                        onChange={(e) => {
+                          setStockProductId(e.target.value);
+                          const product = products.find(p => p.id === e.target.value);
+                          if (product) setStockUnitPrice(product.sell_price);
+                        }}
+                      >
+                        <option value="">Select product...</option>
+                        {products.map(product => (
+                          <option key={product.id} value={product.id}>
+                            {product.name} - ₹{product.sell_price} {product.rack_id && `(${product.rack_id})`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-2">Quantity *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        className="w-full px-4 py-2 border rounded-lg"
+                        value={stockQuantity}
+                        onChange={(e) => setStockQuantity(parseInt(e.target.value))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-2">Unit Price (₹) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="w-full px-4 py-2 border rounded-lg"
+                        value={stockUnitPrice}
+                        onChange={(e) => setStockUnitPrice(parseFloat(e.target.value))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-2">Notes</label>
+                      <textarea
+                        placeholder="Additional information..."
+                        className="w-full px-4 py-2 border rounded-lg"
+                        rows="3"
+                        value={stockNotes}
+                        onChange={(e) => setStockNotes(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 mt-6">
+                    <button
+                      onClick={addStockItem}
+                      className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                    >
+                      Add Stock
+                    </button>
+                    <button
+                      onClick={() => { setShowAddStockModal(false); resetStockForm(); }}
+                      className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Billing Modal */}
+          {showBillingModal && currentJobCard && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg max-w-md w-full">
+                <div className="p-6 border-b flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Complete & Bill</h2>
+                  <button onClick={() => setShowBillingModal(false)} className="text-2xl text-gray-500 hover:text-red-600">×</button>
+                </div>
+                <div className="p-6">
+                  <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex justify-between mb-2">
+                      <span>Parts & Materials:</span>
+                      <span className="font-semibold">
+                        ₹{currentJobCard.stock_items.reduce((sum, item) => sum + item.total_price, 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block font-semibold mb-2">Labour Charge (₹) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="w-full px-4 py-2 border rounded-lg"
+                        value={labourCharge}
+                        onChange={(e) => setLabourCharge(parseFloat(e.target.value) || 0)}
+                        placeholder="Enter labour charges"
+                      />
+                    </div>
+
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Grand Total:</span>
+                        <span className="text-blue-600">
+                          ₹{(currentJobCard.stock_items.reduce((sum, item) => sum + item.total_price, 0) + (parseFloat(labourCharge) || 0)).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-2">Last Service Date</label>
+                      <input
+                        type="date"
+                        className="w-full px-4 py-2 border rounded-lg"
+                        value={lastServiceDate}
+                        onChange={(e) => setLastServiceDate(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold mb-2">Next Service Date</label>
+                      <input
+                        type="date"
+                        className="w-full px-4 py-2 border rounded-lg"
+                        value={nextServiceDate}
+                        onChange={(e) => setNextServiceDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button
+                      onClick={completeJobCard}
+                      className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                    >
+                      Complete Job Card
+                    </button>
+                    <button
+                      onClick={() => setShowBillingModal(false)}
+                      className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reject Modal */}
+          {showRejectModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg max-w-md w-full">
+                <div className="p-6 border-b flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Reject Job Card</h2>
+                  <button onClick={() => { setShowRejectModal(false); setRejectReason(''); }} className="text-2xl text-gray-500 hover:text-red-600">×</button>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block font-semibold mb-2">Reason for Rejection *</label>
+                      <textarea
+                        placeholder="Enter reason for rejecting this job card..."
+                        className="w-full px-4 py-2 border rounded-lg"
+                        rows="4"
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4 mt-6">
+                    <button
+                      onClick={rejectJobCard}
+                      className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
+                    >
+                      Reject Job Card
+                    </button>
+                    <button
+                      onClick={() => { setShowRejectModal(false); setRejectReason(''); }}
+                      className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function App() {
+      const { isAuthenticated, logout, user } = React.useContext(AuthContext);
+      const [current, setCurrent] = useState('dashboard');
+      if (!isAuthenticated) return <Login />;
+
+      const menu = [
+        { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+        { id: 'customers', label: 'Customers', icon: '👥' },
+        { id: 'stock', label: 'Stock Management', icon: '📦' },
+        { id: 'jobcards', label: 'Job Cards', icon: '🔧' },
+        { id: 'services', label: 'Services', icon: '🔄' },
+        { id: 'sales', label: 'Sales', icon: '💰' },
+      ];
+
+      return (
+        <div className="flex h-screen bg-gray-50 overflow-hidden">
+          <aside className="w-64 bg-white shadow-lg relative">
+            <div className="p-6 border-b">
+              <h1 className="text-2xl font-bold text-blue-600">Retail Manager</h1>
+              <p className="text-sm text-gray-600 mt-1">Welcome, {user?.username || 'User'}</p>
+            </div>
+            <nav className="p-4">
+              {menu.map(m => (
+                <button key={m.id} onClick={() => setCurrent(m.id)} className={`w-full text-left px-4 py-3 mb-2 rounded-lg flex items-center gap-3 ${current===m.id ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>
+                  <span className="text-xl">{m.icon}</span>
+                  <span className="font-medium">{m.label}</span>
+                </button>
+              ))}
+            </nav>
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+              <button onClick={logout} className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Logout</button>
+            </div>
+          </aside>
+
+          <main className="flex-1 flex flex-col overflow-hidden">
+            <header className="bg-white border-b p-4 flex justify-between items-center">
+              <div className="text-lg font-semibold">{menu.find(i=>i.id===current)?.label}</div>
+              <div className="text-sm text-gray-600">Jhansi | {new Date().toLocaleDateString()}</div>
+            </header>
+
+            <section className="flex-1 overflow-auto p-6">
+              {current === 'dashboard' && <Dashboard />}
+              {current === 'customers' && <Customers />}
+              {current === 'stock' && <StockManagement />}
+              {current === 'jobcards' && <JobCards />}
+              {current === 'services' && <Services />}
+              {current === 'sales' && <Sales />}
+            </section>
+
+            <footer className="bg-white border-t p-3 text-center text-sm text-gray-600">
+              © {new Date().getFullYear()} Retail Manager
+            </footer>
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<AuthProvider><App /></AuthProvider>, document.getElementById('root'));
+  </script>
+</body>
+</html>

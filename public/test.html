@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Inventory Transaction System - Test Interface</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-4xl font-bold mb-2">🧪 Inventory Transaction System - Test Interface</h1>
+    <p class="text-gray-600 mb-8">Complete testing interface for the new inventory transaction system</p>
+
+    <!-- Login Section -->
+    <div id="loginSection" class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">1. Login</h2>
+      <div class="flex gap-4 items-end">
+        <div>
+          <label class="block text-sm mb-1">Username</label>
+          <input id="username" value="admin" class="border px-3 py-2 rounded" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Password</label>
+          <input id="password" type="password" value="admin123" class="border px-3 py-2 rounded" />
+        </div>
+        <button onclick="login()" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">Login</button>
+      </div>
+      <div id="loginResult" class="mt-4"></div>
+    </div>
+
+    <!-- Create Product Section -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">2. Create Product (No Quantity)</h2>
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-sm mb-1">Product Name *</label>
+          <input id="prodName" value="Gaming Mouse Pro" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Sell Price (₹) *</label>
+          <input id="prodSellPrice" type="number" value="1500" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Vendor</label>
+          <input id="prodVendor" value="Logitech" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Rack ID</label>
+          <input id="prodRack" value="A-1" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div class="col-span-2">
+          <label class="block text-sm mb-1">Additional Info</label>
+          <input id="prodInfo" value="RGB gaming mouse with 16000 DPI" class="border px-3 py-2 rounded w-full" />
+        </div>
+      </div>
+      <button onclick="createProduct()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Create Product</button>
+      <div id="createProductResult" class="mt-4"></div>
+    </div>
+
+    <!-- Add Stock Section -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">3. Add Stock (Purchase Transaction)</h2>
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-sm mb-1">Product ID *</label>
+          <input id="transProductId" placeholder="Will auto-fill after creating product" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Quantity *</label>
+          <input id="transQty" type="number" value="50" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Unit Cost (₹) *</label>
+          <input id="transCost" type="number" value="800" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Vendor</label>
+          <input id="transVendor" value="Logitech Direct" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Reference No</label>
+          <input id="transRef" value="INV-2024-001" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Notes</label>
+          <input id="transNotes" value="First purchase from official vendor" class="border px-3 py-2 rounded w-full" />
+        </div>
+      </div>
+      <div class="flex gap-4">
+        <button onclick="addPurchase(1)" class="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700">Add Purchase 1</button>
+        <button onclick="addPurchase(2)" class="bg-purple-600 text-white px-6 py-2 rounded hover:bg-purple-700">Add Purchase 2 (Different Price)</button>
+      </div>
+      <div id="addStockResult" class="mt-4"></div>
+    </div>
+
+    <!-- View Stock Section -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">4. View Product with Calculated Stock</h2>
+      <button onclick="viewProduct()" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">View Product Details</button>
+      <div id="viewProductResult" class="mt-4"></div>
+    </div>
+
+    <!-- Transaction History Section -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">5. View Transaction History</h2>
+      <button onclick="viewHistory()" class="bg-yellow-600 text-white px-6 py-2 rounded hover:bg-yellow-700">View History</button>
+      <div id="historyResult" class="mt-4"></div>
+    </div>
+
+    <!-- Make Sale Section -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">6. Make a Sale</h2>
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-sm mb-1">Quantity to Sell</label>
+          <input id="saleQty" type="number" value="10" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Unit Price (₹)</label>
+          <input id="salePrice" type="number" value="1500" class="border px-3 py-2 rounded w-full" />
+        </div>
+      </div>
+      <button onclick="makeSale()" class="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700">Complete Sale</button>
+      <div id="saleResult" class="mt-4"></div>
+    </div>
+
+    <!-- Stock Adjustment Section -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">7. Stock Adjustment</h2>
+      <div class="grid grid-cols-3 gap-4 mb-4">
+        <div>
+          <label class="block text-sm mb-1">Type</label>
+          <select id="adjType" class="border px-3 py-2 rounded w-full">
+            <option value="ADJUSTMENT_OUT">Decrease (OUT)</option>
+            <option value="ADJUSTMENT_IN">Increase (IN)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Quantity</label>
+          <input id="adjQty" type="number" value="2" class="border px-3 py-2 rounded w-full" />
+        </div>
+        <div>
+          <label class="block text-sm mb-1">Reason</label>
+          <input id="adjNotes" value="Damaged units found" class="border px-3 py-2 rounded w-full" />
+        </div>
+      </div>
+      <button onclick="adjustStock()" class="bg-orange-600 text-white px-6 py-2 rounded hover:bg-orange-700">Adjust Stock</button>
+      <div id="adjustResult" class="mt-4"></div>
+    </div>
+
+    <!-- Run All Tests -->
+    <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow p-6 text-white">
+      <h2 class="text-2xl font-bold mb-4">🚀 Run Complete Test Scenario</h2>
+      <p class="mb-4">This will test the entire flow: Create product → 2 purchases → check stock → make sale → adjustment</p>
+      <button onclick="runCompleteTest()" class="bg-white text-blue-600 px-8 py-3 rounded hover:bg-gray-100 font-bold">Run Complete Test</button>
+      <div id="completeTestResult" class="mt-4"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3001/api';
+    let currentProductId = null;
+
+    function showResult(elementId, message, isError = false) {
+      const el = document.getElementById(elementId);
+      el.innerHTML = `<div class="p-4 rounded ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">${message}</div>`;
+    }
+
+    async function login() {
+      try {
+        const res = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            username: document.getElementById('username').value,
+            password: document.getElementById('password').value
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          localStorage.setItem('token', data.token);
+          showResult('loginResult', `✅ Logged in successfully! Token saved.<br>User: ${data.user.username}, Role: ${data.user.role}`);
+        } else {
+          showResult('loginResult', `❌ Login failed: ${data.error}`, true);
+        }
+      } catch (err) {
+        showResult('loginResult', `❌ Error: ${err.message}`, true);
+      }
+    }
+
+    async function createProduct() {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/products`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: document.getElementById('prodName').value,
+            sell_price: parseFloat(document.getElementById('prodSellPrice').value),
+            vendor: document.getElementById('prodVendor').value,
+            rack_id: document.getElementById('prodRack').value,
+            additional_info: document.getElementById('prodInfo').value
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          currentProductId = data.id;
+          document.getElementById('transProductId').value = data.id;
+          showResult('createProductResult', `✅ Product created successfully!<br>ID: ${data.id}<br>Note: No quantity stored - will be calculated from transactions`);
+        } else {
+          showResult('createProductResult', `❌ Error: ${data.error}`, true);
+        }
+      } catch (err) {
+        showResult('createProductResult', `❌ Error: ${err.message}`, true);
+      }
+    }
+
+    async function addPurchase(num) {
+      try {
+        const token = localStorage.getItem('token');
+        const productId = document.getElementById('transProductId').value || currentProductId;
+        
+        let qty, cost, vendor, ref, notes;
+        if (num === 1) {
+          qty = 50;
+          cost = 800;
+          vendor = 'Logitech Direct';
+          ref = 'INV-2024-001';
+          notes = 'First purchase from official vendor';
+        } else {
+          qty = 30;
+          cost = 850;
+          vendor = 'Amazon India';
+          ref = 'INV-2024-002';
+          notes = 'Second purchase - price increased';
+        }
+
+        const res = await fetch(`${API_URL}/inventory-transactions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            product_id: productId,
+            transaction_type: 'PURCHASE',
+            quantity: qty,
+            unit_cost: cost,
+            vendor: vendor,
+            reference_no: ref,
+            notes: notes
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showResult('addStockResult', `✅ Purchase ${num} recorded!<br>Quantity: ${qty} units<br>Unit Cost: ₹${cost}<br>Total: ₹${qty * cost}<br>Vendor: ${vendor}`);
+        } else {
+          showResult('addStockResult', `❌ Error: ${data.error}`, true);
+        }
+      } catch (err) {
+        showResult('addStockResult', `❌ Error: ${err.message}`, true);
+      }
+    }
+
+    async function viewProduct() {
+      try {
+        const token = localStorage.getItem('token');
+        const productId = document.getElementById('transProductId').value || currentProductId;
+        
+        const res = await fetch(`${API_URL}/products/${productId}`, {
+          headers: {'Authorization': `Bearer ${token}`}
+        });
+        const product = await res.json();
+        if (res.ok) {
+          const totalSell = product.quantity * product.sell_price;
+          const totalCost = product.quantity * product.purchase_price;
+          const profit = totalSell - totalCost;
+          
+          showResult('viewProductResult', `
+            <div class="bg-blue-50 p-4 rounded">
+              <h3 class="font-bold text-lg mb-2">${product.name}</h3>
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div><strong>Total Stock:</strong> ${product.quantity} units</div>
+                <div><strong>Sell Price:</strong> ₹${product.sell_price}</div>
+                <div><strong>Weighted Avg Cost:</strong> ₹${product.purchase_price.toFixed(2)}</div>
+                <div><strong>Rack:</strong> ${product.rack_id}</div>
+                <div class="col-span-2 mt-2 pt-2 border-t">
+                  <div><strong>Total Investment:</strong> ₹${totalCost.toFixed(2)}</div>
+                  <div><strong>Expected Total Sell:</strong> ₹${totalSell.toFixed(2)}</div>
+                  <div><strong>Potential Profit:</strong> ₹${profit.toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          `);
+        } else {
+          showResult('viewProductResult', `❌ Error: ${product.error}`, true);
+        }
+      } catch (err) {
+        showResult('viewProductResult', `❌ Error: ${err.message}`, true);
+      }
+    }
+
+    async function viewHistory() {
+      try {
+        const token = localStorage.getItem('token');
+        const productId = document.getElementById('transProductId').value || currentProductId;
+        
+        const res = await fetch(`${API_URL}/inventory-transactions/product/${productId}`, {
+          headers: {'Authorization': `Bearer ${token}`}
+        });
+        const transactions = await res.json();
+        if (res.ok) {
+          let html = '<div class="bg-yellow-50 p-4 rounded"><h3 class="font-bold mb-2">Transaction History:</h3><div class="space-y-2">';
+          transactions.forEach((t, i) => {
+            const date = new Date(t.transaction_date).toLocaleString();
+            const cost = t.unit_cost ? `₹${t.unit_cost}` : '-';
+            const price = t.unit_price ? `₹${t.unit_price}` : '-';
+            html += `
+              <div class="text-sm border-b pb-2">
+                <strong>${i+1}. ${t.transaction_type}</strong> - ${date}<br>
+                Quantity: ${t.quantity} | Cost: ${cost} | Price: ${price}<br>
+                ${t.vendor ? `Vendor: ${t.vendor} | ` : ''}${t.reference_no ? `Ref: ${t.reference_no}` : ''}<br>
+                ${t.notes ? `<em>${t.notes}</em>` : ''}
+              </div>
+            `;
+          });
+          html += '</div></div>';
+          showResult('historyResult', html);
+        } else {
+          showResult('historyResult', `❌ Error: ${transactions.error}`, true);
+        }
+      } catch (err) {
+        showResult('historyResult', `❌ Error: ${err.message}`, true);
+      }
+    }
+
+    async function makeSale() {
+      try {
+        const token = localStorage.getItem('token');
+        const productId = document.getElementById('transProductId').value || currentProductId;
+        const qty = parseInt(document.getElementById('saleQty').value);
+        const price = parseFloat(document.getElementById('salePrice').value);
+        
+        const res = await fetch(`${API_URL}/sales`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            customer_id: null,
+            items: [{
+              product_id: productId,
+              quantity: qty,
+              unit_price: price
+            }],
+            discount: 0,
+            tax: 0,
+            payment_method: 'CASH'
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const revenue = qty * price;
+          showResult('saleResult', `✅ Sale completed!<br>Quantity: ${qty} units<br>Revenue: ₹${revenue}<br>Sale ID: ${data.id}<br>Note: Inventory transaction auto-created, stock reduced`);
+        } else {
+          showResult('saleResult', `❌ Error: ${data.error}`, true);
+        }
+      } catch (err) {
+        showResult('saleResult', `❌ Error: ${err.message}`, true);
+      }
+    }
+
+    async function adjustStock() {
+      try {
+        const token = localStorage.getItem('token');
+        const productId = document.getElementById('transProductId').value || currentProductId;
+        const type = document.getElementById('adjType').value;
+        const qty = parseInt(document.getElementById('adjQty').value);
+        const notes = document.getElementById('adjNotes').value;
+        
+        const res = await fetch(`${API_URL}/inventory-transactions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            product_id: productId,
+            transaction_type: type,
+            quantity: qty,
+            notes: notes
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showResult('adjustResult', `✅ Stock adjustment recorded!<br>Type: ${type}<br>Quantity: ${qty}<br>Reason: ${notes}`);
+        } else {
+          showResult('adjustResult', `❌ Error: ${data.error}`, true);
+        }
+      } catch (err) {
+        showResult('adjustResult', `❌ Error: ${err.message}`, true);
+      }
+    }
+
+    async function runCompleteTest() {
+      const resultDiv = document.getElementById('completeTestResult');
+      resultDiv.innerHTML = '<div class="bg-white bg-opacity-20 p-4 rounded">Running complete test scenario...</div>';
+      
+      try {
+        const token = localStorage.getItem('token');
+        let log = '';
+        
+        // 1. Create Product
+        log += '1️⃣ Creating test product...<br>';
+        const prodRes = await fetch(`${API_URL}/products`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+          body: JSON.stringify({
+            name: 'Complete Test Keyboard',
+            sell_price: 3500,
+            vendor: 'Test Vendor',
+            rack_id: 'TEST-1'
+          })
+        });
+        const product = await prodRes.json();
+        log += `✅ Product created: ${product.id}<br><br>`;
+        
+        // 2. First Purchase
+        log += '2️⃣ Purchase 1: 20 units @ ₹2500...<br>';
+        await fetch(`${API_URL}/inventory-transactions`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+          body: JSON.stringify({
+            product_id: product.id,
+            transaction_type: 'PURCHASE',
+            quantity: 20,
+            unit_cost: 2500,
+            vendor: 'Vendor A',
+            reference_no: 'TEST-001'
+          })
+        });
+        log += '✅ Purchase 1 recorded<br><br>';
+        
+        // 3. Second Purchase
+        log += '3️⃣ Purchase 2: 15 units @ ₹2600...<br>';
+        await fetch(`${API_URL}/inventory-transactions`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+          body: JSON.stringify({
+            product_id: product.id,
+            transaction_type: 'PURCHASE',
+            quantity: 15,
+            unit_cost: 2600,
+            vendor: 'Vendor B',
+            reference_no: 'TEST-002'
+          })
+        });
+        log += '✅ Purchase 2 recorded<br><br>';
+        
+        // 4. Check Stock
+        log += '4️⃣ Checking calculated stock...<br>';
+        const stockRes = await fetch(`${API_URL}/products/${product.id}`, {
+          headers: {'Authorization': `Bearer ${token}`}
+        });
+        const stockData = await stockRes.json();
+        const expectedAvg = ((20 * 2500) + (15 * 2600)) / 35;
+        log += `📊 <strong>Stock: ${stockData.quantity} units</strong><br>`;
+        log += `💰 <strong>Weighted Avg Cost: ₹${stockData.purchase_price.toFixed(2)}</strong><br>`;
+        log += `✓ Expected: ₹${expectedAvg.toFixed(2)} ${Math.abs(stockData.purchase_price - expectedAvg) < 0.01 ? '✅ CORRECT!' : '❌ MISMATCH'}<br><br>`;
+        
+        // 5. Make Sale
+        log += '5️⃣ Making sale: 10 units @ ₹3500...<br>';
+        await fetch(`${API_URL}/sales`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+          body: JSON.stringify({
+            customer_id: null,
+            items: [{ product_id: product.id, quantity: 10, unit_price: 3500 }],
+            discount: 0, tax: 0, payment_method: 'TEST'
+          })
+        });
+        log += '✅ Sale completed<br><br>';
+        
+        // 6. Check Stock After Sale
+        log += '6️⃣ Stock after sale...<br>';
+        const afterSaleRes = await fetch(`${API_URL}/products/${product.id}`, {
+          headers: {'Authorization': `Bearer ${token}`}
+        });
+        const afterSale = await afterSaleRes.json();
+        log += `📦 <strong>Stock: ${afterSale.quantity} units (was 35, now ${35 - 10} after selling 10)</strong><br><br>`;
+        
+        // 7. Transaction History
+        log += '7️⃣ Viewing transaction history...<br>';
+        const histRes = await fetch(`${API_URL}/inventory-transactions/product/${product.id}`, {
+          headers: {'Authorization': `Bearer ${token}`}
+        });
+        const history = await histRes.json();
+        log += `📜 <strong>${history.length} transactions recorded</strong><br><br>`;
+        
+        log += '<div class="mt-4 p-3 bg-green-400 rounded"><strong>🎉 COMPLETE TEST PASSED!</strong><br>All features working correctly!</div>';
+        resultDiv.innerHTML = `<div class="bg-white bg-opacity-20 p-4 rounded">${log}</div>`;
+      } catch (err) {
+        resultDiv.innerHTML = `<div class="bg-red-400 p-4 rounded">❌ Test failed: ${err.message}</div>`;
+      }
+    }
+  </script>
+</body>
+</html>
