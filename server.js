@@ -1163,7 +1163,7 @@ app.get('/api/job-cards/:id/bill', authenticateToken, (req, res) => {
           jcs.*,
           p.name as product_name,
           p.rack_id
-        FROM job_card_stock jcs
+        FROM job_card_stock_items jcs
         LEFT JOIN products p ON jcs.product_id = p.id
         WHERE jcs.job_card_id = ?
       `, [jobCardId], (err, stockItems) => {

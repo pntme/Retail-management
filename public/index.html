@@ -20,7 +20,10 @@
 
   <script type="text/babel">
     const { useState, useEffect } = React;
-    const API_URL = 'http://localhost:3001/api';
+    // Dynamic API URL - works for both local and production
+const API_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3001/api' 
+  : `${window.location.origin}/api`;
     const AuthContext = React.createContext();
 
     function AuthProvider({ children }) {
