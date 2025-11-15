@@ -528,34 +528,106 @@ app.get('/api/customers', authenticateToken, (req, res) => {
 
 app.post('/api/customers', authenticateToken, (req, res) => {
   const { name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date } = req.body;
-  const id = uuidv4();
 
-  db.run(
-    'INSERT INTO customers (id, name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, name, email, phone, address, credit_limit || 0, vehicle_type, vehicle_number, last_service_date, next_service_date],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
+  // Check if vehicle number already exists (if provided)
+  if (vehicle_number && vehicle_number.trim()) {
+    db.get(
+      'SELECT id, name, phone FROM customers WHERE vehicle_number = ?',
+      [vehicle_number.trim()],
+      (err, existingCustomer) => {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+
+        if (existingCustomer) {
+          return res.status(400).json({
+            error: 'Vehicle number already exists',
+            message: `This vehicle number is already registered to ${existingCustomer.name} (${existingCustomer.phone}). Please search with vehicle number to find the existing customer.`,
+            existing_customer: existingCustomer
+          });
+        }
+
+        // No duplicate found, proceed with creation
+        createCustomer();
       }
-      res.json({ id, message: 'Customer created successfully' });
-    }
-  );
+    );
+  } else {
+    // No vehicle number provided, create directly
+    createCustomer();
+  }
+
+  function createCustomer() {
+    const id = uuidv4();
+
+    db.run(
+      'INSERT INTO customers (id, name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, name, email, phone, address, credit_limit || 0, vehicle_type, vehicle_number, last_service_date, next_service_date],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+        // Return the full customer object
+        res.json({
+          id,
+          name,
+          email,
+          phone,
+          address,
+          credit_limit: credit_limit || 0,
+          vehicle_type,
+          vehicle_number,
+          last_service_date,
+          next_service_date,
+          message: 'Customer created successfully'
+        });
+      }
+    );
+  }
 });
 
 app.put('/api/customers/:id', authenticateToken, (req, res) => {
   const { name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date } = req.body;
   const { id } = req.params;
 
-  db.run(
-    'UPDATE customers SET name = ?, email = ?, phone = ?, address = ?, credit_limit = ?, vehicle_type = ?, vehicle_number = ?, last_service_date = ?, next_service_date = ? WHERE id = ?',
-    [name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date, id],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
+  // Check if vehicle number already exists (excluding current customer)
+  if (vehicle_number && vehicle_number.trim()) {
+    db.get(
+      'SELECT id, name, phone FROM customers WHERE vehicle_number = ? AND id != ?',
+      [vehicle_number.trim(), id],
+      (err, existingCustomer) => {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+
+        if (existingCustomer) {
+          return res.status(400).json({
+            error: 'Vehicle number already exists',
+            message: `This vehicle number is already registered to ${existingCustomer.name} (${existingCustomer.phone}). Please search with vehicle number to find the existing customer.`,
+            existing_customer: existingCustomer
+          });
+        }
+
+        // No duplicate found, proceed with update
+        updateCustomer();
       }
-      res.json({ message: 'Customer updated successfully' });
-    }
-  );
+    );
+  } else {
+    // No vehicle number provided, update directly
+    updateCustomer();
+  }
+
+  function updateCustomer() {
+    db.run(
+      'UPDATE customers SET name = ?, email = ?, phone = ?, address = ?, credit_limit = ?, vehicle_type = ?, vehicle_number = ?, last_service_date = ?, next_service_date = ? WHERE id = ?',
+      [name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date, id],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+        res.json({ message: 'Customer updated successfully' });
+      }
+    );
+  }
 });
 
 app.delete('/api/customers/:id', authenticateToken, (req, res) => {
@@ -595,7 +667,7 @@ app.get('/api/customers/:id/service-history', authenticateToken, (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!jobCards || jobCards.length === 0) return res.json([]);
 
-    // For each job card, get tasks and stock items
+    // For each job card, get tasks, stock items, and bill info
     const detailPromises = jobCards.map(jc => {
       return new Promise((resolve, reject) => {
         db.all('SELECT id, task_description, status, created_at FROM job_card_tasks WHERE job_card_id = ? ORDER BY created_at', [jc.id], (err, tasks) => {
@@ -605,17 +677,24 @@ app.get('/api/customers/:id/service-history', authenticateToken, (req, res) => {
                   LEFT JOIN products p ON jcs.product_id = p.id
                   WHERE jcs.job_card_id = ? ORDER BY jcs.created_at`, [jc.id], (err, stockItems) => {
             if (err) return reject(err);
-            resolve({
-              id: jc.id,
-              job_number: jc.job_number,
-              status: jc.status,
-              assignee: jc.assignee,
-              notes: jc.notes,
-              labour_charge: jc.labour_charge,
-              created_at: jc.created_at,
-              closed_at: jc.closed_at,
-              tasks: tasks || [],
-              stock_items: stockItems || []
+
+            // Get bill info for this job card
+            db.all('SELECT id, bill_number, bill_date, total, payment_status FROM bills WHERE job_card_id = ? ORDER BY bill_date DESC', [jc.id], (err, bills) => {
+              if (err) return reject(err);
+
+              resolve({
+                id: jc.id,
+                job_number: jc.job_number,
+                status: jc.status,
+                assignee: jc.assignee,
+                notes: jc.notes,
+                labour_charge: jc.labour_charge,
+                created_at: jc.created_at,
+                closed_at: jc.closed_at,
+                tasks: tasks || [],
+                stock_items: stockItems || [],
+                bills: bills || []
+              });
             });
           });
         });
@@ -2143,6 +2222,145 @@ function generateBillHTML(bill, customer, items) {
 </html>
   `;
 }
+
+// ==================== PROFIT & LOSS ROUTES ====================
+
+// Get profit and loss report with date filtering
+app.get('/api/reports/profit-loss', authenticateToken, (req, res) => {
+  const { from, to } = req.query;
+  const fromDate = from || '1900-01-01';
+  const toDate = to || '2099-12-31';
+
+  // Get total revenue from bills
+  db.get(
+    `SELECT
+      COALESCE(SUM(total), 0) as total_revenue,
+      COUNT(*) as bill_count
+     FROM bills
+     WHERE bill_date >= ? AND bill_date <= ? AND status = 'finalized'`,
+    [fromDate, toDate],
+    (err, revenueData) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      // Get total costs from inventory purchases
+      db.get(
+        `SELECT
+          COALESCE(SUM(total_amount), 0) as total_costs
+         FROM inventory_transactions
+         WHERE transaction_type = 'PURCHASE'
+         AND DATE(transaction_date) >= ? AND DATE(transaction_date) <= ?`,
+        [fromDate, toDate],
+        (err, costData) => {
+          if (err) {
+            return res.status(500).json({ error: err.message });
+          }
+
+          // Get daily breakdown for charts
+          db.all(
+            `SELECT
+              bill_date as date,
+              COALESCE(SUM(total), 0) as revenue,
+              COUNT(*) as transactions
+             FROM bills
+             WHERE bill_date >= ? AND bill_date <= ? AND status = 'finalized'
+             GROUP BY bill_date
+             ORDER BY bill_date`,
+            [fromDate, toDate],
+            (err, dailyRevenue) => {
+              if (err) {
+                return res.status(500).json({ error: err.message });
+              }
+
+              // Get daily costs
+              db.all(
+                `SELECT
+                  DATE(transaction_date) as date,
+                  COALESCE(SUM(total_amount), 0) as costs
+                 FROM inventory_transactions
+                 WHERE transaction_type = 'PURCHASE'
+                 AND DATE(transaction_date) >= ? AND DATE(transaction_date) <= ?
+                 GROUP BY DATE(transaction_date)
+                 ORDER BY DATE(transaction_date)`,
+                [fromDate, toDate],
+                (err, dailyCosts) => {
+                  if (err) {
+                    return res.status(500).json({ error: err.message });
+                  }
+
+                  // Get payment status breakdown
+                  db.all(
+                    `SELECT
+                      payment_status,
+                      COALESCE(SUM(total), 0) as amount,
+                      COUNT(*) as count
+                     FROM bills
+                     WHERE bill_date >= ? AND bill_date <= ?
+                     GROUP BY payment_status`,
+                    [fromDate, toDate],
+                    (err, paymentBreakdown) => {
+                      if (err) {
+                        return res.status(500).json({ error: err.message });
+                      }
+
+                      // Calculate profit/loss
+                      const totalRevenue = revenueData.total_revenue || 0;
+                      const totalCosts = costData.total_costs || 0;
+                      const profitLoss = totalRevenue - totalCosts;
+
+                      // Combine daily data
+                      const dailyData = {};
+
+                      dailyRevenue.forEach(day => {
+                        if (!dailyData[day.date]) {
+                          dailyData[day.date] = { date: day.date, revenue: 0, costs: 0, profit: 0 };
+                        }
+                        dailyData[day.date].revenue = day.revenue;
+                      });
+
+                      dailyCosts.forEach(day => {
+                        if (!dailyData[day.date]) {
+                          dailyData[day.date] = { date: day.date, revenue: 0, costs: 0, profit: 0 };
+                        }
+                        dailyData[day.date].costs = day.costs;
+                      });
+
+                      // Calculate profit for each day
+                      Object.keys(dailyData).forEach(date => {
+                        dailyData[date].profit = dailyData[date].revenue - dailyData[date].costs;
+                      });
+
+                      const dailyChart = Object.values(dailyData).sort((a, b) =>
+                        new Date(a.date) - new Date(b.date)
+                      );
+
+                      res.json({
+                        summary: {
+                          total_revenue: totalRevenue,
+                          total_costs: totalCosts,
+                          profit_loss: profitLoss,
+                          bill_count: revenueData.bill_count,
+                          profit_margin: totalRevenue > 0 ? ((profitLoss / totalRevenue) * 100).toFixed(2) : 0
+                        },
+                        payment_breakdown: paymentBreakdown,
+                        daily_chart: dailyChart,
+                        date_range: {
+                          from: fromDate,
+                          to: toDate
+                        }
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
 
 // ==================== START SERVER ====================
 
