@@ -1445,7 +1445,7 @@ const API_URL = window.location.hostname === 'localhost'
       const fetchJobCards = async () => {
         setLoading(true);
         try {
-          const data = await apiCall('/api/job-cards?status=open');
+          const data = await apiCall('/job-cards?status=open');
           setJobCards(data);
         } catch (error) {
           console.error('Error fetching job cards:', error);
@@ -1457,7 +1457,7 @@ const API_URL = window.location.hostname === 'localhost'
       const fetchCustomers = async () => {
         setLoading(true);
         try {
-          const data = await apiCall('/api/customers');
+          const data = await apiCall('/customers');
           setCustomers(data);
         } catch (error) {
           console.error('Error fetching customers:', error);
@@ -1468,7 +1468,7 @@ const API_URL = window.location.hostname === 'localhost'
       // Fetch products for stock selection
       const fetchProducts = async () => {
         try {
-          const data = await apiCall('/api/products');
+          const data = await apiCall('/products');
           setProducts(data);
         } catch (error) {
           console.error('Error fetching products:', error);
@@ -1479,7 +1479,7 @@ const API_URL = window.location.hostname === 'localhost'
       const loadJobCardDetails = async (jobCardId) => {
         setLoading(true);
         try {
-          const data = await apiCall(`/api/job-cards/${jobCardId}`);
+          const data = await apiCall(`/job-cards/${jobCardId}`);
           setJobCardDetails(data);
           setSelectedJobCard(data);
         } catch (error) {
@@ -1583,7 +1583,7 @@ const API_URL = window.location.hostname === 'localhost'
         }
         setLoading(true);
         try {
-          const created = await apiCall('/api/customers', {
+          const created = await apiCall('/customers', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newCustomer)
@@ -1623,7 +1623,7 @@ const API_URL = window.location.hostname === 'localhost'
             payment_method: paymentMethod
           };
 
-          await apiCall('/api/sales', {
+          await apiCall('/sales', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(saleData)
@@ -1631,7 +1631,7 @@ const API_URL = window.location.hostname === 'localhost'
 
           // If job card mode, mark job card as completed
           if (mode === 'jobcard' && selectedJobCard) {
-            await apiCall(`/api/job-cards/${selectedJobCard.id}/complete`, {
+            await apiCall(`/job-cards/${selectedJobCard.id}/complete`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
