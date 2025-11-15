@@ -1200,6 +1200,11 @@
                 console.log('Generated HTML includes print bill:', detailsHtml.includes('printBill'));
                 document.getElementById('jobCardDetails').innerHTML = detailsHtml;
                 document.getElementById('viewJobCardModal').classList.add('active');
+
+                // Load bills for this job card if it's closed
+                if (job.status === 'closed') {
+                    loadJobCardBills(id);
+                }
             })
             .catch(error => {
                 console.error('Error loading job card:', error);
@@ -1348,7 +1353,24 @@
                 if (data.error) {
                     showModal('Error', data.error);
                 } else {
-                    showModal('Success', 'Job card completed successfully!', function() {
+                    // Show success message with bill options
+                    const billInfo = data.bill;
+                    const message = `
+                        <div style="text-align: center;">
+                            <h3 style="color: #28a745; margin-bottom: 15px;">✓ Job Card Completed!</h3>
+                            <p style="margin-bottom: 10px;">Bill Generated: <strong>${billInfo.bill_number}</strong></p>
+                            <p style="margin-bottom: 10px;">Total: <strong>₹${billInfo.total.toFixed(2)}</strong></p>
+                            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                                <button class="btn btn-primary" onclick="viewBill('${billInfo.id}')" style="padding: 10px 20px;">
+                                    View Bill
+                                </button>
+                                <button class="btn btn-secondary" onclick="downloadBill('${billInfo.id}', '${billInfo.bill_number}')" style="padding: 10px 20px;">
+                                    Download
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    showModal('Success', message, function() {
                         closeCompleteBillModal();
                         closeViewJobCardModal();
                         loadJobCards();
@@ -1971,6 +1993,108 @@
 
         // Initial load
         loadJobCards();
+
+        // ==================== BILL FUNCTIONS ====================
+
+        // View bill in new tab
+        function viewBill(billId) {
+            const url = `${API_URL}/bills/${billId}/view`;
+            const newWindow = window.open(url, '_blank');
+            if (newWindow) {
+                newWindow.opener = null; // Security: prevent access to opener
+            } else {
+                showModal('Error', 'Please allow popups to view the bill');
+            }
+        }
+
+        // Download bill (currently opens as HTML, user can print to PDF)
+        function downloadBill(billId, billNumber) {
+            const url = `${API_URL}/bills/${billId}/view`;
+            const newWindow = window.open(url, '_blank');
+            if (newWindow) {
+                newWindow.opener = null;
+                // Show instructions
+                showModal('Info', 'Bill opened in new tab. Use your browser\'s "Print" or "Save as PDF" option to download.');
+            } else {
+                showModal('Error', 'Please allow popups to download the bill');
+            }
+        }
+
+        // Get bills for a job card (to be used in job card view modal)
+        function loadJobCardBills(jobCardId) {
+            fetch(`${API_URL}/job-cards/${jobCardId}/bills`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(bills => {
+                displayJobCardBills(bills);
+            })
+            .catch(error => {
+                console.error('Error loading bills:', error);
+            });
+        }
+
+        function displayJobCardBills(bills) {
+            if (!bills || bills.length === 0) {
+                return;
+            }
+
+            // Find or create bills section in job card modal
+            const billsSection = document.createElement('div');
+            billsSection.style.marginTop = '20px';
+            billsSection.style.borderTop = '2px solid #ddd';
+            billsSection.style.paddingTop = '15px';
+            billsSection.innerHTML = `
+                <h3 style="margin-bottom: 10px; color: #333;">Bills History</h3>
+                <table class="table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f4f4f4;">
+                            <th style="padding: 8px; text-align: left;">Bill Number</th>
+                            <th style="padding: 8px; text-align: left;">Date</th>
+                            <th style="padding: 8px; text-align: right;">Total</th>
+                            <th style="padding: 8px; text-align: center;">Status</th>
+                            <th style="padding: 8px; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${bills.map(bill => `
+                            <tr style="border-bottom: 1px solid #ddd;">
+                                <td style="padding: 8px;">${bill.bill_number}</td>
+                                <td style="padding: 8px;">${new Date(bill.bill_date).toLocaleDateString('en-IN')}</td>
+                                <td style="padding: 8px; text-align: right;">₹${bill.total.toFixed(2)}</td>
+                                <td style="padding: 8px; text-align: center;">
+                                    <span class="badge ${bill.payment_status === 'paid' ? 'badge-success' : 'badge-warning'}" style="padding: 4px 8px; border-radius: 3px; font-size: 12px;">
+                                        ${bill.payment_status.toUpperCase()}
+                                    </span>
+                                </td>
+                                <td style="padding: 8px; text-align: center;">
+                                    <button class="btn btn-sm btn-primary" onclick="viewBill('${bill.id}')" style="padding: 4px 8px; font-size: 12px; margin-right: 5px;">
+                                        View
+                                    </button>
+                                    <button class="btn btn-sm btn-secondary" onclick="downloadBill('${bill.id}', '${bill.bill_number}')" style="padding: 4px 8px; font-size: 12px;">
+                                        Download
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            // Append to job card details section
+            const detailsSection = document.querySelector('#viewJobCardModal .modal-body');
+            if (detailsSection) {
+                // Remove existing bills section if any
+                const existingBills = detailsSection.querySelector('.bills-history-section');
+                if (existingBills) {
+                    existingBills.remove();
+                }
+                billsSection.classList.add('bills-history-section');
+                detailsSection.appendChild(billsSection);
+            }
+        }
     </script>
 </body>
 </html>
