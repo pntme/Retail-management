@@ -1119,6 +1119,7 @@ const API_URL = window.location.hostname === 'localhost'
     // ------------------ end Reminders ------------------
 
     function Dashboard() {
+      const { user } = React.useContext(AuthContext);
       const [stats, setStats] = useState(null);
       const [loadingStats, setLoadingStats] = useState(false);
 
@@ -1140,7 +1141,7 @@ const API_URL = window.location.hostname === 'localhost'
         <div>
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold">Dashboard</h1>
-            <div className="text-sm text-gray-600">Welcome back — {new Date().toLocaleDateString()}</div>
+            <div className="text-sm text-gray-600">Welcome back, {user?.username || 'User'} — {new Date().toLocaleDateString()}</div>
           </div>
 
           <SectionLoader loading={loadingStats} message="Loading dashboard statistics...">
