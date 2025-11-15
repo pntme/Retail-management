@@ -1122,6 +1122,7 @@ const API_URL = window.location.hostname === 'localhost'
     // ------------------ end Reminders ------------------
 
     function Dashboard() {
+      const { user } = React.useContext(AuthContext);
       const [stats, setStats] = useState(null);
       const [loadingStats, setLoadingStats] = useState(false);
       const salesChartRef = React.useRef(null);
