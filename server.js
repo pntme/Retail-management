@@ -228,6 +228,26 @@ function initializeDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (job_card_id) REFERENCES job_cards(id),
       FOREIGN KEY (product_id) REFERENCES products(id)
+    )`);
+
+    // Bills table (Immutable bill snapshots)
+    db.run(`CREATE TABLE IF NOT EXISTS bills (
+      id TEXT PRIMARY KEY,
+      bill_number TEXT UNIQUE NOT NULL,
+      job_card_id TEXT NOT NULL,
+      bill_date TEXT NOT NULL,
+      customer_data TEXT NOT NULL,
+      bill_items TEXT NOT NULL,
+      labour_charge REAL DEFAULT 0,
+      discount REAL DEFAULT 0,
+      subtotal REAL NOT NULL,
+      total REAL NOT NULL,
+      status TEXT DEFAULT 'finalized',
+      payment_status TEXT DEFAULT 'unpaid',
+      notes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (job_card_id) REFERENCES job_cards(id)
     )`, (err) => {
       if (err) {
         console.error('Error creating tables:', err);
@@ -307,6 +327,122 @@ function authenticateToken(req, res, next) {
     req.user = user;
     next();
   });
+}
+
+// ==================== BILL HELPER FUNCTIONS ====================
+
+// Generate next bill number (Format: BIL-YYYY-NNNN)
+function getNextBillNumber(callback) {
+  const year = new Date().getFullYear();
+  const prefix = `BIL-${year}-`;
+
+  db.get(
+    `SELECT bill_number FROM bills WHERE bill_number LIKE ? ORDER BY bill_number DESC LIMIT 1`,
+    [`${prefix}%`],
+    (err, row) => {
+      if (err) {
+        return callback(err);
+      }
+
+      let nextNumber = 1;
+      if (row && row.bill_number) {
+        const lastNumber = parseInt(row.bill_number.split('-')[2]);
+        nextNumber = lastNumber + 1;
+      }
+
+      const billNumber = `${prefix}${String(nextNumber).padStart(4, '0')}`;
+      callback(null, billNumber);
+    }
+  );
+}
+
+// Generate bill snapshot from job card
+function generateBillSnapshot(jobCardId, callback) {
+  // Get job card details
+  db.get(
+    `SELECT jc.*, c.name as customer_name, c.phone, c.email, c.vehicle_number, c.vehicle_type
+     FROM job_cards jc
+     JOIN customers c ON jc.customer_id = c.id
+     WHERE jc.id = ?`,
+    [jobCardId],
+    (err, jobCard) => {
+      if (err) return callback(err);
+      if (!jobCard) return callback(new Error('Job card not found'));
+
+      // Get tasks
+      db.all(
+        'SELECT task_description FROM job_card_tasks WHERE job_card_id = ?',
+        [jobCardId],
+        (err, tasks) => {
+          if (err) return callback(err);
+
+          // Get stock items
+          db.all(
+            `SELECT jsi.*, p.name as product_name
+             FROM job_card_stock_items jsi
+             JOIN products p ON jsi.product_id = p.id
+             WHERE jsi.job_card_id = ?`,
+            [jobCardId],
+            (err, stockItems) => {
+              if (err) return callback(err);
+
+              // Build customer data
+              const customerData = {
+                name: jobCard.customer_name,
+                phone: jobCard.phone,
+                email: jobCard.email,
+                vehicle_number: jobCard.vehicle_number,
+                vehicle_type: jobCard.vehicle_type
+              };
+
+              // Build bill items (services + parts)
+              const billItems = [];
+
+              // Add services as line items
+              tasks.forEach(task => {
+                billItems.push({
+                  type: 'service',
+                  description: task.task_description,
+                  quantity: 1,
+                  rate: 0,
+                  amount: 0
+                });
+              });
+
+              // Add parts
+              let partsTotal = 0;
+              stockItems.forEach(item => {
+                billItems.push({
+                  type: 'part',
+                  description: item.product_name,
+                  quantity: item.quantity,
+                  rate: item.unit_price,
+                  amount: item.total_price
+                });
+                partsTotal += item.total_price;
+              });
+
+              // Calculate totals
+              const labourCharge = jobCard.labour_charge || 0;
+              const discount = jobCard.discount || 0;
+              const subtotal = partsTotal + labourCharge;
+              const total = subtotal - discount;
+
+              callback(null, {
+                customer: customerData,
+                items: billItems,
+                labour_charge: labourCharge,
+                discount: discount,
+                subtotal: subtotal,
+                total: total,
+                parts_total: partsTotal
+              });
+            }
+          );
+        }
+      );
+    }
+  );
 }
 
 // ==================== AUTH ROUTES ====================
@@ -1403,10 +1539,61 @@ app.post('/api/job-cards/:id/complete', authenticateToken, (req, res) => {
           }
         });
 
-        res.json({ 
-          message: 'Job card completed successfully', 
-          last_service_date: finalLastService,
-          next_service_date: finalNextService
+        // Auto-create bill when job card is completed
+        getNextBillNumber((err, billNumber) => {
+          if (err) {
+            console.error('Error generating bill number:', err);
+            return res.status(500).json({ error: 'Failed to generate bill number' });
+          }
+
+          generateBillSnapshot(jobCardId, (err, billData) => {
+            if (err) {
+              console.error('Error generating bill snapshot:', err);
+              return res.status(500).json({ error: 'Failed to generate bill' });
+            }
+
+            const billId = uuidv4();
+            const billDate = formatDate(today);
+
+            db.run(`
+              INSERT INTO bills (
+                id, bill_number, job_card_id, bill_date,
+                customer_data, bill_items,
+                labour_charge, discount, subtotal, total,
+                status, payment_status
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+              billId,
+              billNumber,
+              jobCardId,
+              billDate,
+              JSON.stringify(billData.customer),
+              JSON.stringify(billData.items),
+              billData.labour_charge,
+              billData.discount,
+              billData.subtotal,
+              billData.total,
+              'finalized',
+              'unpaid'
+            ], function(err) {
+              if (err) {
+                console.error('Error creating bill:', err);
+                return res.status(500).json({ error: 'Failed to create bill' });
+              }
+
+              res.json({
+                message: 'Job card completed and bill generated successfully',
+                last_service_date: finalLastService,
+                next_service_date: finalNextService,
+                bill: {
+                  id: billId,
+                  bill_number: billNumber,
+                  bill_date: billDate,
+                  total: billData.total
+                }
+              });
+            });
+          });
         });
       });
     });
@@ -1532,6 +1719,409 @@ app.put('/api/job-cards/:id', authenticateToken, (req, res) => {
     });
   });
 });
+
+// ==================== BILL ROUTES ====================
+
+// Get all bills for a specific job card
+app.get('/api/job-cards/:id/bills', authenticateToken, (req, res) => {
+  const jobCardId = req.params.id;
+
+  db.all(
+    `SELECT id, bill_number, bill_date, total, status, payment_status, created_at
+     FROM bills
+     WHERE job_card_id = ?
+     ORDER BY bill_date DESC`,
+    [jobCardId],
+    (err, bills) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.json(bills);
+    }
+  );
+});
+
+// Get bill details by ID
+app.get('/api/bills/:id', authenticateToken, (req, res) => {
+  const billId = req.params.id;
+
+  db.get(
+    'SELECT * FROM bills WHERE id = ?',
+    [billId],
+    (err, bill) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (!bill) {
+        return res.status(404).json({ error: 'Bill not found' });
+      }
+
+      // Parse JSON fields
+      bill.customer_data = JSON.parse(bill.customer_data);
+      bill.bill_items = JSON.parse(bill.bill_items);
+
+      res.json(bill);
+    }
+  );
+});
+
+// List all bills with optional filters
+app.get('/api/bills', authenticateToken, (req, res) => {
+  const { from, to, status, payment_status, search } = req.query;
+
+  let query = `
+    SELECT b.*, jc.job_number
+    FROM bills b
+    JOIN job_cards jc ON b.job_card_id = jc.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (from) {
+    query += ' AND b.bill_date >= ?';
+    params.push(from);
+  }
+
+  if (to) {
+    query += ' AND b.bill_date <= ?';
+    params.push(to);
+  }
+
+  if (status) {
+    query += ' AND b.status = ?';
+    params.push(status);
+  }
+
+  if (payment_status) {
+    query += ' AND b.payment_status = ?';
+    params.push(payment_status);
+  }
+
+  if (search) {
+    query += ' AND (b.bill_number LIKE ? OR jc.job_number LIKE ?)';
+    const searchTerm = `%${search}%`;
+    params.push(searchTerm, searchTerm);
+  }
+
+  query += ' ORDER BY b.bill_date DESC, b.created_at DESC';
+
+  db.all(query, params, (err, bills) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    // Parse JSON fields for each bill
+    bills.forEach(bill => {
+      bill.customer_data = JSON.parse(bill.customer_data);
+      bill.bill_items = JSON.parse(bill.bill_items);
+    });
+
+    res.json(bills);
+  });
+});
+
+// View bill as HTML (for browser display)
+app.get('/api/bills/:id/view', authenticateToken, (req, res) => {
+  const billId = req.params.id;
+
+  db.get('SELECT * FROM bills WHERE id = ?', [billId], (err, bill) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!bill) {
+      return res.status(404).json({ error: 'Bill not found' });
+    }
+
+    const customer = JSON.parse(bill.customer_data);
+    const items = JSON.parse(bill.bill_items);
+
+    // Generate HTML invoice
+    const html = generateBillHTML(bill, customer, items);
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  });
+});
+
+// Download bill as PDF (to be implemented with PDF library)
+app.get('/api/bills/:id/download', authenticateToken, (req, res) => {
+  const billId = req.params.id;
+
+  db.get('SELECT * FROM bills WHERE id = ?', [billId], (err, bill) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!bill) {
+      return res.status(404).json({ error: 'Bill not found' });
+    }
+
+    const customer = JSON.parse(bill.customer_data);
+    const items = JSON.parse(bill.bill_items);
+
+    // Generate HTML first (will convert to PDF later)
+    const html = generateBillHTML(bill, customer, items);
+
+    // For now, return HTML - will be replaced with PDF generation
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-Disposition', `attachment; filename="${bill.bill_number}.html"`);
+    res.send(html);
+  });
+});
+
+// Mark bill as paid
+app.post('/api/bills/:id/mark-paid', authenticateToken, (req, res) => {
+  const billId = req.params.id;
+
+  db.run(
+    'UPDATE bills SET payment_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    ['paid', billId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Bill not found' });
+      }
+      res.json({ message: 'Bill marked as paid successfully' });
+    }
+  );
+});
+
+// Cancel a bill
+app.post('/api/bills/:id/cancel', authenticateToken, (req, res) => {
+  const billId = req.params.id;
+  const { reason } = req.body;
+
+  db.run(
+    `UPDATE bills
+     SET status = 'cancelled',
+         notes = COALESCE(notes || '\n', '') || ?,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [`Cancellation reason: ${reason || 'No reason provided'}`, billId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Bill not found' });
+      }
+      res.json({ message: 'Bill cancelled successfully' });
+    }
+  );
+});
+
+// Helper function to generate bill HTML
+function generateBillHTML(bill, customer, items) {
+  const serviceItems = items.filter(item => item.type === 'service');
+  const partItems = items.filter(item => item.type === 'part');
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice ${bill.bill_number}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .invoice-header {
+      text-align: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #333;
+      padding-bottom: 20px;
+    }
+    .invoice-header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    .invoice-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .info-section h3 {
+      margin-bottom: 10px;
+      color: #555;
+      font-size: 14px;
+      text-transform: uppercase;
+    }
+    .info-section p {
+      margin: 5px 0;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background-color: #f4f4f4;
+      font-weight: bold;
+      color: #333;
+    }
+    .text-right { text-align: right; }
+    .summary {
+      margin-left: auto;
+      width: 300px;
+      margin-top: 20px;
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .summary-row.total {
+      font-size: 18px;
+      font-weight: bold;
+      border-top: 2px solid #333;
+      border-bottom: 3px double #333;
+      margin-top: 10px;
+      padding-top: 10px;
+    }
+    .footer {
+      margin-top: 50px;
+      text-align: center;
+      color: #666;
+      font-size: 12px;
+      border-top: 1px solid #ddd;
+      padding-top: 20px;
+    }
+    @media print {
+      body { padding: 20px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-header">
+    <h1>INVOICE</h1>
+    <p style="font-size: 14px; color: #666;">Invoice #${bill.bill_number}</p>
+  </div>
+
+  <div class="invoice-info">
+    <div class="info-section">
+      <h3>Bill To:</h3>
+      <p><strong>${customer.name}</strong></p>
+      ${customer.phone ? `<p>Phone: ${customer.phone}</p>` : ''}
+      ${customer.email ? `<p>Email: ${customer.email}</p>` : ''}
+      ${customer.vehicle_number ? `<p>Vehicle: ${customer.vehicle_number}</p>` : ''}
+      ${customer.vehicle_type ? `<p>Model: ${customer.vehicle_type}</p>` : ''}
+    </div>
+    <div class="info-section" style="text-align: right;">
+      <h3>Invoice Details:</h3>
+      <p><strong>Date:</strong> ${new Date(bill.bill_date).toLocaleDateString('en-IN')}</p>
+      <p><strong>Invoice #:</strong> ${bill.bill_number}</p>
+      <p><strong>Status:</strong> ${bill.payment_status.toUpperCase()}</p>
+    </div>
+  </div>
+
+  ${serviceItems.length > 0 ? `
+  <h3 style="margin: 20px 0 10px 0; color: #333;">Services Provided</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 60%;">Service Description</th>
+        <th class="text-right">Qty</th>
+        <th class="text-right">Rate</th>
+        <th class="text-right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${serviceItems.map(item => `
+        <tr>
+          <td>${item.description}</td>
+          <td class="text-right">${item.quantity}</td>
+          <td class="text-right">₹${item.rate.toFixed(2)}</td>
+          <td class="text-right">₹${item.amount.toFixed(2)}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+
+  ${partItems.length > 0 ? `
+  <h3 style="margin: 20px 0 10px 0; color: #333;">Parts & Materials</h3>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 60%;">Item Description</th>
+        <th class="text-right">Qty</th>
+        <th class="text-right">Rate</th>
+        <th class="text-right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${partItems.map(item => `
+        <tr>
+          <td>${item.description}</td>
+          <td class="text-right">${item.quantity}</td>
+          <td class="text-right">₹${item.rate.toFixed(2)}</td>
+          <td class="text-right">₹${item.amount.toFixed(2)}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  ` : ''}
+
+  <div class="summary">
+    ${bill.labour_charge > 0 ? `
+      <div class="summary-row">
+        <span>Labour Charge:</span>
+        <span>₹${bill.labour_charge.toFixed(2)}</span>
+      </div>
+    ` : ''}
+    <div class="summary-row">
+      <span>Subtotal:</span>
+      <span>₹${bill.subtotal.toFixed(2)}</span>
+    </div>
+    ${bill.discount > 0 ? `
+      <div class="summary-row" style="color: #d9534f;">
+        <span>Discount:</span>
+        <span>- ₹${bill.discount.toFixed(2)}</span>
+      </div>
+    ` : ''}
+    <div class="summary-row total">
+      <span>TOTAL:</span>
+      <span>₹${bill.total.toFixed(2)}</span>
+    </div>
+  </div>
+
+  ${bill.notes ? `
+  <div style="margin-top: 30px; padding: 15px; background: #f9f9f9; border-left: 3px solid #333;">
+    <strong>Notes:</strong><br/>
+    ${bill.notes}
+  </div>
+  ` : ''}
+
+  <div class="footer">
+    <p>Thank you for your business!</p>
+    <p style="margin-top: 10px;">This is a computer-generated invoice.</p>
+  </div>
+
+  <div class="no-print" style="margin-top: 30px; text-align: center;">
+    <button onclick="window.print()" style="padding: 10px 30px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+      Print Invoice
+    </button>
+  </div>
+</body>
+</html>
+  `;
+}
 
 // ==================== START SERVER ====================
 
