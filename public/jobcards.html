@@ -1514,6 +1514,39 @@
         // Print bill
         function printBill() {
             // Show loading overlay
+            showLoadingOverlay('Loading bill...');
+
+            // First, get the bills for this job card
+            fetch(`${API_URL}/job-cards/${currentJobCardId}/bills`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(bills => {
+                hideLoadingOverlay();
+
+                if (!bills || bills.length === 0) {
+                    showModal('Error', 'No bill found for this job card');
+                    return;
+                }
+
+                // Get the most recent bill
+                const latestBill = bills[0];
+
+                // Open bill in new tab
+                viewBill(latestBill.id);
+            })
+            .catch(error => {
+                console.error('Error loading bill:', error);
+                showModal('Error', 'Failed to load bill');
+                hideLoadingOverlay();
+            });
+        }
+
+        // Old printBill function backup (using old /job-cards/:id/bill endpoint)
+        function printBillOld() {
+            // Show loading overlay
             showLoadingOverlay('Generating bill...');
 
             fetch(`${API_URL}/job-cards/${currentJobCardId}/bill`, {
@@ -2084,7 +2117,7 @@
             `;
 
             // Append to job card details section
-            const detailsSection = document.querySelector('#viewJobCardModal .modal-body');
+            const detailsSection = document.getElementById('jobCardDetails');
             if (detailsSection) {
                 // Remove existing bills section if any
                 const existingBills = detailsSection.querySelector('.bills-history-section');
