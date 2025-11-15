@@ -245,7 +245,8 @@ function initializeDatabase() {
     db.run(`CREATE TABLE IF NOT EXISTS bills (
       id TEXT PRIMARY KEY,
       bill_number TEXT UNIQUE NOT NULL,
-      job_card_id TEXT NOT NULL,
+      job_card_id TEXT,
+      sale_id TEXT,
       bill_date TEXT NOT NULL,
       customer_data TEXT NOT NULL,
       bill_items TEXT NOT NULL,
@@ -258,13 +259,30 @@ function initializeDatabase() {
       notes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (job_card_id) REFERENCES job_cards(id)
+      FOREIGN KEY (job_card_id) REFERENCES job_cards(id),
+      FOREIGN KEY (sale_id) REFERENCES sales(id)
     )`, (err) => {
       if (err) {
         console.error('Error creating tables:', err);
       } else {
         console.log('✅ All database tables created successfully');
-        
+
+        // Migration: Add sale_id column to bills if it doesn't exist
+        db.all(`PRAGMA table_info(bills)`, [], (err, columns) => {
+          if (!err && columns) {
+            const hasSaleId = columns.some(col => col.name === 'sale_id');
+            if (!hasSaleId) {
+              db.run(`ALTER TABLE bills ADD COLUMN sale_id TEXT`, (err) => {
+                if (err) {
+                  console.error('Error adding sale_id column to bills:', err);
+                } else {
+                  console.log('✅ Added sale_id column to bills table');
+                }
+              });
+            }
+          }
+        });
+
         // Migration: Add labour_charge column to job_cards if it doesn't exist
         db.all(`PRAGMA table_info(job_cards)`, [], (err, columns) => {
           if (!err && columns) {
@@ -1102,13 +1120,13 @@ app.get('/api/sales/:id', authenticateToken, (req, res) => {
 app.post('/api/sales', authenticateToken, (req, res) => {
   const { customer_id, items, discount, tax, payment_method } = req.body;
   const saleId = uuidv4();
-  
+
   // Calculate total
   let total = 0;
   items.forEach(item => {
     total += item.quantity * item.unit_price;
   });
-  
+
   const discountAmount = discount || 0;
   const taxAmount = tax || 0;
   const totalAmount = total - discountAmount + taxAmount;
@@ -1128,10 +1146,10 @@ app.post('/api/sales', authenticateToken, (req, res) => {
       items.forEach(item => {
         const itemId = uuidv4();
         const subtotal = item.quantity * item.unit_price;
-        
+
         // Insert sale item
         saleItemStmt.run(itemId, saleId, item.product_id, item.quantity, item.unit_price, subtotal);
-        
+
         // Create inventory transaction (SALE = stock decrease)
         const transId = uuidv4();
         inventoryStmt.run(transId, item.product_id, 'SALE', item.quantity, item.unit_price, subtotal, saleId, req.user.id);
@@ -1140,7 +1158,71 @@ app.post('/api/sales', authenticateToken, (req, res) => {
       saleItemStmt.finalize();
       inventoryStmt.finalize();
 
-      res.json({ id: saleId, message: 'Sale created successfully', total: totalAmount });
+      // Create a bill for this direct sale
+      db.get('SELECT * FROM customers WHERE id = ?', [customer_id], (err, customer) => {
+        if (err || !customer) {
+          console.error('Error fetching customer for bill:', err);
+          return res.json({ id: saleId, message: 'Sale created successfully', total: totalAmount });
+        }
+
+        // Generate bill number
+        const billNumber = `BILL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const billId = uuidv4();
+        const billDate = new Date().toISOString().split('T')[0];
+
+        // Prepare customer data
+        const customerData = {
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone || '',
+          email: customer.email || '',
+          address: customer.address || ''
+        };
+
+        // Prepare bill items
+        const billItems = items.map(item => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          subtotal: item.quantity * item.unit_price
+        }));
+
+        db.run(
+          `INSERT INTO bills (
+            id, bill_number, sale_id, bill_date, customer_data, bill_items,
+            labour_charge, discount, subtotal, total, status, payment_status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            billId,
+            billNumber,
+            saleId,
+            billDate,
+            JSON.stringify(customerData),
+            JSON.stringify(billItems),
+            0, // labour_charge
+            discountAmount,
+            total,
+            totalAmount,
+            'finalized',
+            payment_method === 'cash' ? 'paid' : 'unpaid'
+          ],
+          function(err) {
+            if (err) {
+              console.error('Error creating bill for sale:', err);
+            } else {
+              console.log('✅ Bill created for direct sale:', billNumber);
+            }
+            res.json({
+              id: saleId,
+              bill_id: billId,
+              bill_number: billNumber,
+              message: 'Sale and bill created successfully',
+              total: totalAmount
+            });
+          }
+        );
+      });
     }
   );
 });
@@ -1504,23 +1586,93 @@ app.delete('/api/job-cards/:jobCardId/stock-items/:stockItemId', authenticateTok
 // Update task status
 app.put('/api/job-cards/:jobCardId/tasks/:taskId', authenticateToken, (req, res) => {
   const { jobCardId, taskId } = req.params;
-  const { status } = req.body;
-  
-  if (!status) {
-    return res.status(400).json({ error: 'Status required' });
+  const { status, task_description } = req.body;
+
+  // Build update query dynamically based on what's provided
+  const updates = [];
+  const values = [];
+
+  if (status) {
+    updates.push('status = ?');
+    values.push(status);
   }
-  
+
+  if (task_description) {
+    updates.push('task_description = ?');
+    values.push(task_description);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  values.push(taskId, jobCardId);
+
   db.run(`
-    UPDATE job_card_tasks SET status = ? WHERE id = ? AND job_card_id = ?
-  `, [status, taskId, jobCardId], function(err) {
+    UPDATE job_card_tasks SET ${updates.join(', ')} WHERE id = ? AND job_card_id = ?
+  `, values, function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
     if (this.changes === 0) {
       return res.status(404).json({ error: 'Task not found' });
     }
-    res.json({ message: 'Task status updated successfully' });
+    res.json({ message: 'Task updated successfully' });
   });
+});
+
+// Add a new task to a job card
+app.post('/api/job-cards/:jobCardId/tasks', authenticateToken, (req, res) => {
+  const { jobCardId } = req.params;
+  const { task_description } = req.body;
+
+  if (!task_description || !task_description.trim()) {
+    return res.status(400).json({ error: 'Task description is required' });
+  }
+
+  // Check if job card exists and is not completed/rejected
+  db.get('SELECT status FROM job_cards WHERE id = ?', [jobCardId], (err, jobCard) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!jobCard) {
+      return res.status(404).json({ error: 'Job card not found' });
+    }
+    if (jobCard.status === 'completed' || jobCard.status === 'rejected') {
+      return res.status(400).json({ error: 'Cannot add tasks to a completed or rejected job card' });
+    }
+
+    const taskId = uuidv4();
+    db.run(
+      'INSERT INTO job_card_tasks (id, job_card_id, task_description, status) VALUES (?, ?, ?, ?)',
+      [taskId, jobCardId, task_description.trim(), 'pending'],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+        res.json({ id: taskId, message: 'Task added successfully' });
+      }
+    );
+  });
+});
+
+// Delete a task from a job card
+app.delete('/api/job-cards/:jobCardId/tasks/:taskId', authenticateToken, (req, res) => {
+  const { jobCardId, taskId } = req.params;
+
+  db.run(
+    'DELETE FROM job_card_tasks WHERE id = ? AND job_card_id = ?',
+    [taskId, jobCardId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+      res.json({ message: 'Task deleted successfully' });
+    }
+  );
 });
 
 // Get bill details for job card
@@ -1883,7 +2035,7 @@ app.get('/api/bills', authenticateToken, (req, res) => {
   let query = `
     SELECT b.*, jc.job_number
     FROM bills b
-    JOIN job_cards jc ON b.job_card_id = jc.id
+    LEFT JOIN job_cards jc ON b.job_card_id = jc.id
     WHERE 1=1
   `;
   const params = [];
@@ -1925,6 +2077,10 @@ app.get('/api/bills', authenticateToken, (req, res) => {
     bills.forEach(bill => {
       bill.customer_data = JSON.parse(bill.customer_data);
       bill.bill_items = JSON.parse(bill.bill_items);
+      // Set job_number to empty string if null (for direct sales)
+      if (!bill.job_number) {
+        bill.job_number = 'DIRECT SALE';
+      }
     });
 
     res.json(bills);
