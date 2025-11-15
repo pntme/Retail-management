@@ -4640,10 +4640,10 @@ const API_URL = window.location.hostname === 'localhost'
           )}
 
           {/* Sidebar - hidden on mobile, overlay on mobile when open, always visible on lg screens */}
-          <aside className={`fixed lg:relative inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
+          <aside className={`fixed lg:relative inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out flex flex-col ${
             menuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           }`}>
-            <div className="p-4 lg:p-6 border-b">
+            <div className="p-4 lg:p-6 border-b flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-xl lg:text-2xl font-bold text-blue-600">Jyoti Auto Parts</h1>
@@ -4659,7 +4659,7 @@ const API_URL = window.location.hostname === 'localhost'
                 </button>
               </div>
             </div>
-            <nav className="p-3 lg:p-4 overflow-y-auto" style={{maxHeight: 'calc(100vh - 180px)'}}>
+            <nav className="flex-1 p-3 lg:p-4 overflow-y-auto">
               {menu.map(m => (
                 <button
                   key={m.id}
