@@ -2031,7 +2031,7 @@
 
         // View bill in new tab
         function viewBill(billId) {
-            const url = `${API_URL}/bills/${billId}/view`;
+            const url = `${API_URL}/bills/${billId}/view?token=${encodeURIComponent(token)}`;
             const newWindow = window.open(url, '_blank');
             if (newWindow) {
                 newWindow.opener = null; // Security: prevent access to opener
@@ -2042,7 +2042,7 @@
 
         // Download bill (currently opens as HTML, user can print to PDF)
         function downloadBill(billId, billNumber) {
-            const url = `${API_URL}/bills/${billId}/view`;
+            const url = `${API_URL}/bills/${billId}/view?token=${encodeURIComponent(token)}`;
             const newWindow = window.open(url, '_blank');
             if (newWindow) {
                 newWindow.opener = null;
