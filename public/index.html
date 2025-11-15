@@ -128,7 +128,7 @@ const API_URL = window.location.hostname === 'localhost'
       );
     }
 
-    // ------------------ Customers component (with requested changes) ------------------
+    // ------------------ Customers component (enhanced) ------------------
     function Customers() {
       const [customers, setCustomers] = useState([]);
       const [search, setSearch] = useState('');
@@ -139,15 +139,25 @@ const API_URL = window.location.hostname === 'localhost'
       const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
       const [deleteId, setDeleteId] = useState(null);
 
+      // pagination
+      const [page, setPage] = useState(1);
+      const pageSize = 12;
+
+      // reminders / filters
+      const [reminderStart, setReminderStart] = useState('');
+      const [reminderEnd, setReminderEnd] = useState('');
+
+      // service history modal
+      const [showServiceHistory, setShowServiceHistory] = useState(false);
+      const [serviceHistory, setServiceHistory] = useState([]);
+
       const initialForm = {
         name: '',
         email: '',
         phone: '',
         address: '',
         vehicle_number: '',
-        vehicle_type: '',
-        last_service_date: '',
-        next_service_date: ''
+        vehicle_type: ''
       };
 
       const [form, setForm] = useState(initialForm);
@@ -157,30 +167,21 @@ const API_URL = window.location.hostname === 'localhost'
       const loadCustomers = async () => {
         try {
           const data = await apiCall(`/customers?search=${encodeURIComponent(search)}`);
-          setCustomers(data);
+          setCustomers(data || []);
+          setPage(1);
         } catch (err) { console.error(err); }
       };
 
-      // helper to normalize vehicle number: uppercase + non-alphanumeric removed
       const normalizeVehicleNumber = (value) => {
         if (!value) return '';
         return value.toUpperCase().replace(/[^A-Z0-9]/g, '');
       };
 
-      const onVehicleNumberChange = (value) => {
-        setForm(prev => ({ ...prev, vehicle_number: normalizeVehicleNumber(value) }));
-      };
+      const onVehicleNumberChange = (value) => setForm(prev => ({ ...prev, vehicle_number: normalizeVehicleNumber(value) }));
 
       const validateForm = () => {
         if (!form.name.trim()) { alert('Name is required'); return false; }
-        if (!form.vehicle_type.trim()) { alert('Vehicle type is required'); return false; }
-        if (!form.vehicle_number.trim()) { alert('Vehicle number is required'); return false; }
-        // vehicle_number must be alphanumeric uppercase (after normalization)
-        const vn = form.vehicle_number;
-        if (!/^[A-Z0-9]+$/.test(vn)) { alert('Vehicle number must be alphanumeric (A-Z,0-9)'); return false; }
-        if (!form.phone.trim()) { alert('Phone number is required'); return false; }
-        // optional: basic phone format check
-        if (!/^[0-9+\- ]{6,20}$/.test(form.phone)) { if(!confirm('Phone looks unusual. Continue?')) return false; }
+        if (!form.phone.trim()) { alert('Phone is required'); return false; }
         return true;
       };
 
@@ -193,9 +194,7 @@ const API_URL = window.location.hostname === 'localhost'
           phone: c.phone ?? '',
           address: c.address ?? '',
           vehicle_number: c.vehicle_number ?? '',
-          vehicle_type: c.vehicle_type ?? '',
-          last_service_date: c.last_service_date ?? '',
-          next_service_date: c.next_service_date ?? ''
+          vehicle_type: c.vehicle_type ?? ''
         });
         setShowForm(true);
       };
@@ -213,28 +212,81 @@ const API_URL = window.location.hostname === 'localhost'
         } catch (err) { alert(err.message); }
       };
 
-      const handleDelete = async (id) => {
-        setDeleteId(id);
-        setShowDeleteConfirm(true);
-      };
+      const handleDelete = async (id) => { setDeleteId(id); setShowDeleteConfirm(true); };
 
       const confirmDelete = async () => {
-        try { 
-          await apiCall(`/customers/${deleteId}`, { method: 'DELETE' }); 
-          loadCustomers(); 
-        } catch (err) { 
-          alert(err.message); 
-        }
-        setShowDeleteConfirm(false);
-        setDeleteId(null);
+        try { await apiCall(`/customers/${deleteId}`, { method: 'DELETE' }); loadCustomers(); } catch (err) { alert(err.message); }
+        setShowDeleteConfirm(false); setDeleteId(null);
       };
 
-      const cancelDelete = () => {
-        setShowDeleteConfirm(false);
-        setDeleteId(null);
-      };
+      const cancelDelete = () => { setShowDeleteConfirm(false); setDeleteId(null); };
 
       const handleView = (customer) => { setViewCustomer(customer); setShowView(true); };
+
+      // service history
+      const openServiceHistory = async (customer) => {
+        try {
+          const data = await apiCall(`/customers/${customer.id}/service-history`);
+          setServiceHistory(data || []);
+        } catch (err) {
+          console.warn('service history not available via API, using empty list', err);
+          setServiceHistory([]);
+        }
+        setShowServiceHistory(true);
+      };
+
+      // job card quick-create (simple inline modal)
+      const [showCreateJobCard, setShowCreateJobCard] = useState(false);
+      const [jcCustomer, setJcCustomer] = useState(null);
+      const [jcVehicle, setJcVehicle] = useState('');
+      const [jcTasks, setJcTasks] = useState(['']);
+
+      const openCreateJobCardFor = (customer) => { setJcCustomer(customer); setJcVehicle(customer.vehicle_number || ''); setJcTasks(['']); setShowCreateJobCard(true); };
+
+      const createJobCardInline = async () => {
+        if (!jcCustomer) return alert('No customer selected');
+        const tasks = jcTasks.map(t => t.trim()).filter(Boolean);
+        if (tasks.length === 0) return alert('Add at least one task');
+        try {
+          await apiCall('/job-cards', { method: 'POST', body: JSON.stringify({ customer_id: jcCustomer.id, vehicle_number: jcVehicle, tasks }) });
+          setShowCreateJobCard(false); setJcCustomer(null); setJcVehicle(''); setJcTasks(['']);
+          alert('Job card created');
+        } catch (err) { alert(err.message); }
+      };
+
+      // call logs inside view modal (readonly - just display)
+      const [callNotes, setCallNotes] = useState([]);
+
+      useEffect(() => {
+        if (viewCustomer) {
+          // attempt to load call logs
+          (async () => {
+            try {
+              const data = await apiCall(`/customers/${viewCustomer.id}/call-logs`);
+              setCallNotes(data || []);
+            } catch (e) {
+              setCallNotes(viewCustomer.call_logs || []);
+            }
+          })();
+        } else {
+          setCallNotes([]);
+        }
+      }, [viewCustomer]);
+
+      // reminders - moved to separate component
+      const getReminders = () => {
+        const list = (customers || []).map(c => ({ id: c.id, name: c.name, phone: c.phone, next_service_date: c.next_service_date })).filter(i => i.next_service_date);
+        if (reminderStart && reminderEnd) {
+          const s = new Date(reminderStart); s.setHours(0,0,0,0);
+          const e = new Date(reminderEnd); e.setHours(23,59,59,999);
+          return list.filter(i => { const d = new Date(i.next_service_date); return d >= s && d <= e; });
+        }
+        return list;
+      };
+
+      // pagination helpers
+      const totalPages = Math.max(1, Math.ceil((customers || []).length / pageSize));
+      const pagedCustomers = (customers || []).slice((page-1)*pageSize, page*pageSize);
 
       return (
         <div>
@@ -252,7 +304,6 @@ const API_URL = window.location.hostname === 'localhost'
           </div>
 
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            {/* table-level horizontal scroll only */}
             <div className="w-full overflow-x-auto">
               <table className="min-w-[900px] w-full table-auto">
                 <thead className="bg-gray-50">
@@ -260,18 +311,18 @@ const API_URL = window.location.hostname === 'localhost'
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle No.</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Service</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next Service</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {customers.map(c => (
+                  {pagedCustomers.map(c => (
                     <tr key={c.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          {/* view icon */}
+                          {/* view details */}
                           <button title="View" onClick={() => handleView(c)} className="text-gray-600 hover:text-gray-900">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -279,14 +330,30 @@ const API_URL = window.location.hostname === 'localhost'
                             </svg>
                           </button>
 
-                          {/* edit icon */}
+                          {/* service history icon */}
+                          <button title="Service History" onClick={() => openServiceHistory(c)} className="text-indigo-600 hover:text-indigo-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M8 2a1 1 0 011 1v1h2V3a1 1 0 112 0v1h1a2 2 0 012 2v1H3V6a2 2 0 012-2h1V3a1 1 0 011-1z" />
+                              <path d="M3 9h14v6a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            </svg>
+                          </button>
+
+                          {/* open job card */}
+                          <button title="Create Job Card" onClick={() => openCreateJobCardFor(c)} className="text-green-600 hover:text-green-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M6 2a1 1 0 00-1 1v2h10V3a1 1 0 00-1-1H6z" />
+                              <path fillRule="evenodd" d="M4 7h12v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+
+                          {/* edit */}
                           <button title="Edit" onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                               <path d="M17.414 2.586a2 2 0 010 2.828L8.414 14.414a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464L14.586 2.586a2 2 0 012.828 0z" />
                             </svg>
                           </button>
 
-                          {/* delete icon */}
+                          {/* delete */}
                           <button title="Delete" onClick={() => handleDelete(c.id)} className="text-red-600 hover:text-red-800">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H3a1 1 0 100 2h14a1 1 0 100-2h-2V3a1 1 0 00-1-1H6zm2 6a1 1 0 10-2 0v7a1 1 0 102 0V8zm6 0a1 1 0 10-2 0v7a1 1 0 102 0V8z" clipRule="evenodd" />
@@ -295,15 +362,25 @@ const API_URL = window.location.hostname === 'localhost'
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap max-w-xs overflow-hidden text-ellipsis font-medium">{c.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">{c.phone}</td>
+                      <td className="px-6 py-4 whitespace-nowrap"><a href={`tel:${c.phone}`} className="text-blue-600 hover:underline">{c.phone}</a></td>
+                      <td className="px-6 py-4 whitespace-nowrap">{c.email || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">{c.vehicle_type || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap font-mono">{c.vehicle_number || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">{c.last_service_date || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">{c.next_service_date || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap max-w-sm overflow-hidden text-ellipsis">{c.address || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* pagination */}
+          <div className="flex items-center justify-between mt-3">
+            <div className="text-sm text-gray-600">Showing {(customers||[]).length === 0 ? 0 : ((page-1)*pageSize+1)} - {Math.min(page*pageSize, (customers||[]).length)} of {(customers||[]).length} customers</div>
+            <div className="flex items-center gap-2">
+              <button disabled={page<=1} onClick={() => setPage(p => Math.max(1, p-1))} className="px-3 py-1 border rounded disabled:opacity-50">Prev</button>
+              <div className="px-3 py-1 border rounded">{page}/{totalPages}</div>
+              <button disabled={page>=totalPages} onClick={() => setPage(p => Math.min(totalPages, p+1))} className="px-3 py-1 border rounded disabled:opacity-50">Next</button>
             </div>
           </div>
 
@@ -319,24 +396,6 @@ const API_URL = window.location.hostname === 'localhost'
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">Vehicle Type *</label>
-                    <input type="text" value={form.vehicle_type} onChange={e => setForm(prev => ({ ...prev, vehicle_type: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Vehicle Number *</label>
-                    <input
-                      type="text"
-                      value={form.vehicle_number}
-                      onChange={e => onVehicleNumberChange(e.target.value)}
-                      className="w-full px-3 py-2 border rounded"
-                      placeholder="Alphanumeric - will be uppercased"
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Only A-Z and 0-9 are allowed. Will be stored in uppercase.</p>
-                  </div>
-
-                  <div>
                     <label className="block text-sm font-medium mb-1">Phone *</label>
                     <input type="text" value={form.phone} onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
                   </div>
@@ -347,13 +406,20 @@ const API_URL = window.location.hostname === 'localhost'
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">Last Service Date</label>
-                    <input type="date" value={form.last_service_date} onChange={e => setForm(prev => ({ ...prev, last_service_date: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+                    <label className="block text-sm font-medium mb-1">Vehicle Type</label>
+                    <input type="text" value={form.vehicle_type} onChange={e => setForm(prev => ({ ...prev, vehicle_type: e.target.value }))} className="w-full px-3 py-2 border rounded" />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">Next Service Date</label>
-                    <input type="date" value={form.next_service_date} onChange={e => setForm(prev => ({ ...prev, next_service_date: e.target.value }))} className="w-full px-3 py-2 border rounded" />
+                    <label className="block text-sm font-medium mb-1">Vehicle Number</label>
+                    <input
+                      type="text"
+                      value={form.vehicle_number}
+                      onChange={e => onVehicleNumberChange(e.target.value)}
+                      className="w-full px-3 py-2 border rounded"
+                      placeholder="Alphanumeric - will be uppercased"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Only A-Z and 0-9 are allowed. Will be stored in uppercase.</p>
                   </div>
 
                   <div className="col-span-2">
@@ -370,19 +436,101 @@ const API_URL = window.location.hostname === 'localhost'
             </Modal>
           )}
 
+          {/* Service History modal */}
+          {showServiceHistory && (
+            <Modal onClose={() => { setShowServiceHistory(false); setServiceHistory([]); }} wide={true}>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Service History</h2>
+                <button onClick={() => window.print()} className="px-3 py-2 bg-gray-200 rounded">Print</button>
+              </div>
+              <div className="space-y-3">
+                {serviceHistory.length === 0 ? (
+                  <div className="text-gray-500">No service history available.</div>
+                ) : (
+                  serviceHistory.map((s, i) => (
+                    <div key={i} className="p-3 border rounded">
+                      <div className="text-sm text-gray-600">Date</div>
+                      <div className="font-medium">{new Date(s.date).toLocaleString()}</div>
+                      <div className="text-sm text-gray-600 mt-2">Notes</div>
+                      <div>{s.notes}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Modal>
+          )}
+
+          {/* Create Job Card inline modal */}
+          {showCreateJobCard && (
+            <Modal onClose={() => setShowCreateJobCard(false)} wide={false}>
+              <h2 className="text-2xl font-bold mb-4">Create Job Card for {jcCustomer?.name}</h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vehicle Number</label>
+                  <input value={jcVehicle} onChange={e=>setJcVehicle(e.target.value)} className="w-full px-3 py-2 border rounded" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tasks</label>
+                  {jcTasks.map((t, idx) => (
+                    <div key={idx} className="flex gap-2 mb-2">
+                      <input value={t} onChange={e => { const arr=[...jcTasks]; arr[idx]=e.target.value; setJcTasks(arr); }} className="flex-1 px-3 py-2 border rounded" />
+                      {jcTasks.length>1 && <button onClick={()=>setJcTasks(prev=>prev.filter((_,i)=>i!==idx))} className="px-3 py-2 bg-red-600 text-white rounded">Remove</button>}
+                    </div>
+                  ))}
+                  <button onClick={()=>setJcTasks(prev=>[...prev,''])} className="px-3 py-2 bg-gray-600 text-white rounded">+ Add Task</button>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={createJobCardInline} className="flex-1 px-4 py-2 bg-green-600 text-white rounded">Create</button>
+                  <button onClick={()=>setShowCreateJobCard(false)} className="flex-1 px-4 py-2 border rounded">Cancel</button>
+                </div>
+              </div>
+            </Modal>
+          )}
+
           {/* View modal */}
           {showView && viewCustomer && (
             <Modal onClose={() => { setShowView(false); setViewCustomer(null); }} wide={false}>
               <h2 className="text-2xl font-bold mb-4">Customer Details</h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4 mb-6">
                 <div><div className="text-sm text-gray-500">Name</div><div className="font-medium">{viewCustomer.name}</div></div>
                 <div><div className="text-sm text-gray-500">Vehicle Type</div><div className="font-medium">{viewCustomer.vehicle_type || '-'}</div></div>
                 <div><div className="text-sm text-gray-500">Vehicle Number</div><div className="font-medium">{viewCustomer.vehicle_number || '-'}</div></div>
-                <div><div className="text-sm text-gray-500">Phone</div><div className="font-medium">{viewCustomer.phone}</div></div>
+                <div><div className="text-sm text-gray-500">Phone</div><div className="font-medium"><a href={`tel:${viewCustomer.phone}`} className="text-blue-600 hover:underline">{viewCustomer.phone}</a></div></div>
                 <div><div className="text-sm text-gray-500">Email</div><div className="font-medium">{viewCustomer.email || '-'}</div></div>
-                <div><div className="text-sm text-gray-500">Last Service</div><div className="font-medium">{viewCustomer.last_service_date || '-'}</div></div>
-                <div><div className="text-sm text-gray-500">Next Service</div><div className="font-medium">{viewCustomer.next_service_date || '-'}</div></div>
                 <div className="col-span-2"><div className="text-sm text-gray-500">Address</div><div className="font-medium">{viewCustomer.address || '-'}</div></div>
+              </div>
+
+              <div className="border-t pt-4 mb-4">
+                <h3 className="text-lg font-semibold mb-3">Service Dates</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-blue-50 rounded">
+                    <div className="text-sm text-gray-600">Last Service Date</div>
+                    <div className="font-medium text-lg">{viewCustomer.last_service_date ? new Date(viewCustomer.last_service_date).toLocaleDateString() : 'Not available'}</div>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded">
+                    <div className="text-sm text-gray-600">Next Service Date</div>
+                    <div className="font-medium text-lg">{viewCustomer.next_service_date ? new Date(viewCustomer.next_service_date).toLocaleDateString() : 'Not available'}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-semibold mb-3">Call Log</h3>
+                <div className="space-y-3">
+                  <div className="max-h-72 overflow-y-auto">
+                    {callNotes.length === 0 ? (
+                      <div className="text-sm text-gray-500 p-3">No call notes yet</div>
+                    ) : (
+                      callNotes.map((n, idx) => (
+                        <div key={idx} className="p-3 border rounded bg-gray-50 mb-2">
+                          <div className="text-xs text-gray-500">{new Date(n.created_at).toLocaleString()}</div>
+                          <div className="mt-1 text-sm">{n.note || n.notes || n.description}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="text-xs text-blue-600 text-center mt-2">💡 Add call logs from the Reminders section</div>
+                </div>
               </div>
             </Modal>
           )}
@@ -401,17 +549,345 @@ const API_URL = window.location.hostname === 'localhost'
     }
     // ------------------ end Customers ------------------
 
+    // ------------------ Reminders component ------------------
+    function Reminders() {
+      const [customers, setCustomers] = useState([]);
+      const [reminderStart, setReminderStart] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate()); // today
+        return d.toISOString().split('T')[0];
+      });
+      const [reminderEnd, setReminderEnd] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 7); // 7 days from today
+        return d.toISOString().split('T')[0];
+      });
+      const [page, setPage] = useState(1);
+      const pageSize = 12;
+
+      // service history modal
+      const [showServiceHistory, setShowServiceHistory] = useState(false);
+      const [serviceHistory, setServiceHistory] = useState([]);
+
+      // call logs modal
+      const [showCallLogs, setShowCallLogs] = useState(false);
+      const [callLogs, setCallLogs] = useState([]);
+      const [callLogsCustomer, setCallLogsCustomer] = useState(null);
+      const [newCallNote, setNewCallNote] = useState('');
+
+      useEffect(() => { loadCustomers(); }, []);
+
+      const loadCustomers = async () => {
+        try {
+          const data = await apiCall('/customers');
+          setCustomers(data || []);
+          setPage(1);
+        } catch (err) { console.error(err); }
+      };
+
+      const getReminders = () => {
+        const list = (customers || []).map(c => ({ id: c.id, name: c.name, phone: c.phone, next_service_date: c.next_service_date })).filter(i => i.next_service_date);
+        if (reminderStart && reminderEnd) {
+          const s = new Date(reminderStart); s.setHours(0,0,0,0);
+          const e = new Date(reminderEnd); e.setHours(23,59,59,999);
+          return list.filter(i => { const d = new Date(i.next_service_date); return d >= s && d <= e; });
+        }
+        return list;
+      };
+
+      const openServiceHistory = async (customer) => {
+        try {
+          const data = await apiCall(`/customers/${customer.id}/service-history`);
+          setServiceHistory(data || []);
+        } catch (err) {
+          console.warn('service history not available', err);
+          setServiceHistory([]);
+        }
+        setShowServiceHistory(true);
+      };
+
+      const openCallLogs = async (customer) => {
+        try {
+          const data = await apiCall(`/customers/${customer.id}/call-logs`);
+          setCallLogs(data || []);
+        } catch (err) {
+          console.warn('call logs not available', err);
+          setCallLogs([]);
+        }
+        setCallLogsCustomer(customer);
+        setShowCallLogs(true);
+      };
+
+      const addCallNote = async () => {
+        if (!newCallNote.trim() || !callLogsCustomer) return;
+        const note = { note: newCallNote.trim(), created_at: new Date().toISOString() };
+        setCallLogs(prev => [note, ...prev]);
+        setNewCallNote('');
+        try { 
+          await apiCall(`/customers/${callLogsCustomer.id}/call-logs`, { method: 'POST', body: JSON.stringify(note) }); 
+        } catch (e) { 
+          console.warn('Failed to persist call note', e); 
+        }
+      };
+
+      const reminders = getReminders();
+      const totalPages = Math.max(1, Math.ceil(reminders.length / pageSize));
+      const pagedReminders = reminders.slice((page-1)*pageSize, page*pageSize);
+
+      return (
+        <div>
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">Reminders - Service Due</h1>
+            <div className="bg-white rounded-lg shadow p-4 flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium">Start Date</label>
+                <input type="date" value={reminderStart} onChange={e => { setReminderStart(e.target.value); setPage(1); }} className="px-3 py-2 border rounded" />
+                <label className="text-sm font-medium">End Date</label>
+                <input type="date" value={reminderEnd} onChange={e => { setReminderEnd(e.target.value); setPage(1); }} className="px-3 py-2 border rounded" />
+                <button onClick={() => { 
+                  const d = new Date();
+                  setReminderStart(d.toISOString().split('T')[0]);
+                  setReminderEnd(new Date(d.getTime() + 7*24*60*60*1000).toISOString().split('T')[0]);
+                  setPage(1);
+                }} className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300">Reset (7 days)</button>
+              </div>
+              <div className="text-sm font-medium text-blue-600">Total: {reminders.length} reminders</div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="w-full overflow-x-auto">
+              <table className="min-w-[900px] w-full table-auto">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next Service Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {pagedReminders.map(r => {
+                    const serviceDate = new Date(r.next_service_date);
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    const daysUntil = Math.ceil((serviceDate.getTime() - today.getTime()) / (1000*60*60*24));
+                    const isPast = daysUntil < 0;
+                    const statusText = isPast ? `Overdue for ${Math.abs(daysUntil)} days` : `Upcoming service in ${daysUntil} days`;
+                    const statusColor = isPast ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
+                    
+                    return (
+                      <tr key={r.id} className={`${isPast ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50'}`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {/* service history */}
+                            <button 
+                              title="Service History" 
+                              onClick={() => { const c = customers.find(x=>x.id===r.id); if(c) openServiceHistory(c); }} 
+                              className="text-indigo-600 hover:text-indigo-800">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M8 2a1 1 0 011 1v1h2V3a1 1 0 112 0v1h1a2 2 0 012 2v1H3V6a2 2 0 012-2h1V3a1 1 0 011-1z" />
+                                <path d="M3 9h14v6a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                              </svg>
+                            </button>
+
+                            {/* call logs */}
+                            <button 
+                              title="Call Logs" 
+                              onClick={() => { const c = customers.find(x=>x.id===r.id); if(c) openCallLogs(c); }} 
+                              className="text-green-600 hover:text-green-800">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773c.058.3.102.605.102.92v1.972c0 .78.545 1.437 1.276 1.782.58.305 1.316.309 1.896 0 .76-.397 1.276-1.002 1.276-1.782V8.004c0-.315.044-.62.102-.92l-1.548-.773a1 1 0 01-.54-1.06l.74-4.435A1 1 0 0110.848 2h2.153a1 1 0 011 1v2a1 1 0 11-2 0V3h-2v2a1 1 0 11-2 0V3H4v2a1 1 0 11-2 0V3z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium">{r.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap"><a href={`tel:${r.phone}`} className="text-blue-600 hover:underline">{r.phone}</a></td>
+                        <td className="px-6 py-4 whitespace-nowrap">{serviceDate.toLocaleDateString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColor}`}>
+                            {statusText}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* pagination */}
+          <div className="flex items-center justify-between mt-3">
+            <div className="text-sm text-gray-600">Showing {reminders.length === 0 ? 0 : ((page-1)*pageSize+1)} - {Math.min(page*pageSize, reminders.length)} of {reminders.length} reminders</div>
+            <div className="flex items-center gap-2">
+              <button disabled={page<=1} onClick={() => setPage(p => Math.max(1, p-1))} className="px-3 py-1 border rounded disabled:opacity-50">Prev</button>
+              <div className="px-3 py-1 border rounded">{page}/{totalPages}</div>
+              <button disabled={page>=totalPages} onClick={() => setPage(p => Math.min(totalPages, p+1))} className="px-3 py-1 border rounded disabled:opacity-50">Next</button>
+            </div>
+          </div>
+
+          {/* Service History Modal */}
+          {showServiceHistory && (
+            <Modal onClose={() => { setShowServiceHistory(false); setServiceHistory([]); }} wide={true}>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Service History</h2>
+                <button onClick={() => window.print()} className="px-3 py-2 bg-gray-200 rounded">Print</button>
+              </div>
+              <div className="space-y-3">
+                {serviceHistory.length === 0 ? (
+                  <div className="text-gray-500">No service history available.</div>
+                ) : (
+                  serviceHistory.map((s, i) => (
+                    <div key={i} className="p-3 border rounded">
+                      <div className="text-sm text-gray-600">Date</div>
+                      <div className="font-medium">{new Date(s.date).toLocaleString()}</div>
+                      <div className="text-sm text-gray-600 mt-2">Notes</div>
+                      <div>{s.notes}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Modal>
+          )}
+
+          {/* Call Logs Modal */}
+          {showCallLogs && callLogsCustomer && (
+            <Modal onClose={() => { setShowCallLogs(false); setCallLogsCustomer(null); setCallLogs([]); setNewCallNote(''); }} wide={false}>
+              <h2 className="text-2xl font-bold mb-4">Call Logs - {callLogsCustomer.name}</h2>
+              <div className="space-y-3">
+                <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                  <label className="text-sm font-medium block mb-2">Add New Call Log</label>
+                  <div className="flex gap-2">
+                    <input 
+                      value={newCallNote} 
+                      onChange={e => setNewCallNote(e.target.value)} 
+                      placeholder="Enter call notes..." 
+                      className="flex-1 px-3 py-2 border rounded" 
+                    />
+                    <button 
+                      onClick={addCallNote} 
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h3 className="text-sm font-semibold mb-2">Call History</h3>
+                  <div className="max-h-96 overflow-y-auto">
+                    {callLogs.length === 0 ? (
+                      <div className="text-sm text-gray-500 p-3">No call logs yet</div>
+                    ) : (
+                      callLogs.map((log, idx) => (
+                        <div key={idx} className="p-3 border rounded bg-gray-50 mb-2">
+                          <div className="text-xs text-gray-500">{new Date(log.created_at).toLocaleString()}</div>
+                          <div className="text-sm text-gray-600 mt-1">By: {log.created_by || 'Unknown'}</div>
+                          <div className="mt-2 text-sm">{log.note || log.notes}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Modal>
+          )}
+        </div>
+      );
+    }
+    // ------------------ end Reminders ------------------
+
     function Dashboard() {
       const [stats, setStats] = useState(null);
       useEffect(() => { (async () => { try { const d = await apiCall('/dashboard/stats'); setStats(d); } catch (e) { console.error(e); } })(); }, []);
       return (
         <div>
-          <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard title="Today's Sales" value={`₹${(stats?.today_sales ?? 0).toFixed(2)}`} icon="💰" color="bg-green-500" />
-            <StatCard title="Transactions" value={stats?.today_transactions ?? 0} icon="🛒" color="bg-blue-500" />
-            <StatCard title="Total Customers" value={stats?.total_customers ?? 0} icon="👥" color="bg-purple-500" />
-            <StatCard title="Low Stock Items" value={stats?.low_stock_items ?? 0} icon="⚠️" color="bg-red-500" />
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <div className="text-sm text-gray-600">Welcome back — {new Date().toLocaleDateString()}</div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-500">Today's Sales</div>
+                  <div className="text-2xl font-bold mt-1">₹{(stats?.today_sales ?? 0).toFixed(2)}</div>
+                </div>
+                <div className="text-3xl">💰</div>
+              </div>
+              <div className="mt-4 text-sm text-gray-500">Transactions: {stats?.today_transactions ?? 0}</div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-500">Total Customers</div>
+                  <div className="text-2xl font-bold mt-1">{stats?.total_customers ?? 0}</div>
+                </div>
+                <div className="text-3xl">👥</div>
+              </div>
+              <div className="mt-4 text-sm text-gray-500">Active services: {stats?.active_services ?? 0}</div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-500">Low Stock Items</div>
+                  <div className="text-2xl font-bold mt-1">{stats?.low_stock_items ?? 0}</div>
+                </div>
+                <div className="text-3xl">⚠️</div>
+              </div>
+              <div className="mt-4 text-sm text-gray-500">Monthly Sales: ₹{(stats?.monthly_sales ?? 0).toFixed(2)}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold">Upcoming Services (Next 7 days)</h3>
+                <div className="text-sm text-gray-500">{stats?.upcoming_count ?? 0} customers</div>
+              </div>
+              {stats?.upcoming_services && stats.upcoming_services.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.upcoming_services.slice(0,10).map(s => (
+                    <div key={s.id} className="p-3 border rounded flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{s.name}</div>
+                        <div className="text-sm text-gray-500">{s.phone} • {new Date(s.next_service_date).toLocaleDateString()}</div>
+                      </div>
+                      <div className="text-sm text-blue-600">View</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No upcoming services in next 7 days</div>
+              )}
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold">Overdue Services (Past 7 days)</h3>
+                <div className="text-sm text-gray-500">{stats?.overdue_count ?? 0} customers</div>
+              </div>
+              {stats?.overdue_services && stats.overdue_services.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.overdue_services.slice(0,10).map(s => (
+                    <div key={s.id} className="p-3 border rounded flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{s.name}</div>
+                        <div className="text-sm text-gray-500">{s.phone} • {new Date(s.next_service_date).toLocaleDateString()}</div>
+                      </div>
+                      <div className="text-sm text-red-600">Overdue</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">No overdue services in past 7 days</div>
+              )}
+            </div>
           </div>
         </div>
       );
@@ -437,7 +913,6 @@ const API_URL = window.location.hostname === 'localhost'
       const initialForm = {
         name: '',
         sell_price: '',
-        vendor: '',
         rack_id: '',
         additional_info: ''
       };
@@ -445,7 +920,6 @@ const API_URL = window.location.hostname === 'localhost'
       const initialPurchaseForm = {
         quantity: '',
         unit_cost: '',
-        vendor: '',
         reference_no: '',
         notes: ''
       };
@@ -473,12 +947,11 @@ const API_URL = window.location.hostname === 'localhost'
       const filterProducts = () => {
         let filtered = products;
 
-        // Filter by search term (name, vendor)
+        // Filter by search term (name)
         if (searchTerm.trim()) {
           const term = searchTerm.toLowerCase();
           filtered = filtered.filter(p => 
-            p.name.toLowerCase().includes(term) || 
-            (p.vendor && p.vendor.toLowerCase().includes(term))
+            p.name.toLowerCase().includes(term)
           );
         }
 
@@ -512,7 +985,6 @@ const API_URL = window.location.hostname === 'localhost'
           sell_price: p.sell_price ?? '',
           quantity: p.quantity ?? '',
           purchase_price: p.purchase_price ?? '',
-          vendor: p.vendor ?? '',
           rack_id: p.rack_id ?? '',
           additional_info: p.additional_info ?? ''
         });
@@ -528,7 +1000,6 @@ const API_URL = window.location.hostname === 'localhost'
             sell_price: parseFloat(form.sell_price),
             quantity: parseInt(form.quantity),
             purchase_price: parseFloat(form.purchase_price),
-            vendor: form.vendor || null,
             rack_id: form.rack_id || null,
             additional_info: form.additional_info || null
           };
@@ -593,7 +1064,7 @@ const API_URL = window.location.hostname === 'localhost'
                   type="text"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Search by product name or vendor..."
+                  placeholder="Search by product name..."
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -639,7 +1110,6 @@ const API_URL = window.location.hostname === 'localhost'
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Purchase Price (₹)</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Purchase (₹)</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expected Total Sell (₹)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack ID</th>
                   </tr>
                 </thead>
@@ -674,7 +1144,6 @@ const API_URL = window.location.hostname === 'localhost'
                         <td className="px-6 py-4 whitespace-nowrap">₹{parseFloat(p.purchase_price).toFixed(2)}</td>
                         <td className="px-6 py-4 whitespace-nowrap font-medium text-orange-600">₹{totalPurchasePrice.toFixed(2)}</td>
                         <td className="px-6 py-4 whitespace-nowrap font-medium text-green-600">₹{expectedTotalSellPrice.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{p.vendor || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap">{p.rack_id || '-'}</td>
                       </tr>
                     );
@@ -715,11 +1184,6 @@ const API_URL = window.location.hostname === 'localhost'
                   <div>
                     <label className="block text-sm font-medium mb-1">Unit Purchase Price (₹) *</label>
                     <input type="number" step="0.01" min="0" value={form.purchase_price} onChange={e => setForm(prev => ({ ...prev, purchase_price: e.target.value }))} className="w-full px-3 py-2 border rounded" required />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Vendor</label>
-                    <input type="text" value={form.vendor} onChange={e => setForm(prev => ({ ...prev, vendor: e.target.value }))} className="w-full px-3 py-2 border rounded" />
                   </div>
 
                   <div className="col-span-2">
@@ -787,7 +1251,6 @@ const API_URL = window.location.hostname === 'localhost'
                   </div>
                 </div>
 
-                <div><div className="text-sm text-gray-500">Vendor</div><div className="font-medium">{viewProduct.vendor || '-'}</div></div>
                 <div><div className="text-sm text-gray-500">Rack ID</div><div className="font-medium">{viewProduct.rack_id || '-'}</div></div>
                 <div className="col-span-2"><div className="text-sm text-gray-500">Additional Info</div><div className="font-medium">{viewProduct.additional_info || '-'}</div></div>
                 
@@ -833,9 +1296,16 @@ const API_URL = window.location.hostname === 'localhost'
       const [searchTerm, setSearchTerm] = useState('');
       const [rackFilter, setRackFilter] = useState('');
       const [allRacks, setAllRacks] = useState([]);
+      
+      // Modal state for alerts and confirmations
+      const [modalMessage, setModalMessage] = useState('');
+      const [modalType, setModalType] = useState('info'); // 'info', 'error', 'success', 'confirm'
+      const [showModal, setShowModal] = useState(false);
+      const [modalAction, setModalAction] = useState(null);
+      const [deleteProductId, setDeleteProductId] = useState(null);
 
       const [productForm, setProductForm] = useState({
-        name: '', sell_price: '', vendor: '', rack_id: '', additional_info: ''
+        name: '', sell_price: '', rack_id: '', additional_info: ''
       });
 
       const [purchaseForm, setPurchaseForm] = useState({
@@ -862,14 +1332,35 @@ const API_URL = window.location.hostname === 'localhost'
       const loadTransactions = async (productId) => {
         try {
           const data = await apiCall(`/inventory-transactions/product/${productId}`);
-          setTransactions(data);
+          // Fetch documents for all transactions
+          const docPromises = data.map(t =>
+            apiCall(`/documents/INVENTORY_TRANSACTION/${t.id}`).then(docs => ({ id: t.id, docs: docs || [] })).catch(() => ({ id: t.id, docs: [] }))
+          );
+          const docsArr = await Promise.all(docPromises);
+          const docsMap = Object.fromEntries(docsArr.map(d => [d.id, d.docs[0] || null]));
+          // Merge document_path, document_id, and document_name into each transaction
+          const merged = data.map(t => ({
+            ...t,
+            document_path: docsMap[t.id]?.file_path || null,
+            document_id: docsMap[t.id]?.id || null,
+            document_name: docsMap[t.id]?.file_name || null
+          }));
+          setTransactions(merged);
         } catch (err) { console.error(err); }
+      };
+
+      // Helper function to show modal messages
+      const showMessage = (message, type = 'info', action = null) => {
+        setModalMessage(message);
+        setModalType(type);
+        setModalAction(action);
+        setShowModal(true);
       };
 
       const handleAddProduct = async (e) => {
         e.preventDefault();
-        if (!productForm.name.trim()) { alert('Product name is required'); return; }
-        if (!productForm.sell_price || parseFloat(productForm.sell_price) <= 0) { alert('Valid sell price is required'); return; }
+        if (!productForm.name.trim()) { showMessage('Product name is required', 'error'); return; }
+        if (!productForm.sell_price || parseFloat(productForm.sell_price) <= 0) { showMessage('Valid sell price is required', 'error'); return; }
         
         try {
           await apiCall('/products', {
@@ -877,21 +1368,20 @@ const API_URL = window.location.hostname === 'localhost'
             body: JSON.stringify({
               name: productForm.name,
               sell_price: parseFloat(productForm.sell_price),
-              vendor: productForm.vendor,
               rack_id: productForm.rack_id,
               additional_info: productForm.additional_info
             })
           });
           setShowAddProduct(false);
-          setProductForm({ name: '', sell_price: '', vendor: '', rack_id: '', additional_info: '' });
+          setProductForm({ name: '', sell_price: '', rack_id: '', additional_info: '' });
           loadProducts();
-        } catch (err) { alert(err.message); }
+        } catch (err) { showMessage(err.message, 'error'); }
       };
 
       const handleAddPurchase = async (e) => {
         e.preventDefault();
-        if (!purchaseForm.quantity || parseInt(purchaseForm.quantity) <= 0) { alert('Valid quantity is required'); return; }
-        if (!purchaseForm.unit_cost || parseFloat(purchaseForm.unit_cost) <= 0) { alert('Valid unit cost is required'); return; }
+        if (!purchaseForm.quantity || parseInt(purchaseForm.quantity) <= 0) { showMessage('Valid quantity is required', 'error'); return; }
+        if (!purchaseForm.unit_cost || parseFloat(purchaseForm.unit_cost) <= 0) { showMessage('Valid unit cost is required', 'error'); return; }
         
         try {
           const requestData = {
@@ -933,7 +1423,7 @@ const API_URL = window.location.hostname === 'localhost'
 
       const handleAdjustment = async (e) => {
         e.preventDefault();
-        if (!adjustmentForm.quantity || parseInt(adjustmentForm.quantity) <= 0) { alert('Valid quantity is required'); return; }
+        if (!adjustmentForm.quantity || parseInt(adjustmentForm.quantity) <= 0) { showMessage('Valid quantity is required', 'error'); return; }
         
         try {
           await apiCall('/inventory-transactions', {
@@ -957,14 +1447,17 @@ const API_URL = window.location.hostname === 'localhost'
 
       const handleFileUpload = async (e) => {
         e.preventDefault();
-        if (!uploadFile) { alert('Please select a file'); return; }
+        if (!uploadFile) { showMessage('Please select a file', 'error'); return; }
 
         const formData = new FormData();
-        formData.append('document', uploadFile);
-        formData.append('transaction_id', uploadTransaction.id);
+        formData.append('file', uploadFile);
+        formData.append('document_type', 'TRANSACTION');
+        formData.append('related_entity_type', 'INVENTORY_TRANSACTION');
+        formData.append('related_entity_id', uploadTransaction.id);
+        formData.append('notes', '');
 
         try {
-          const res = await fetch(`${API_URL}/inventory-transactions/${uploadTransaction.id}/upload`, {
+          const res = await fetch(`${API_URL}/documents/upload`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
             body: formData
@@ -972,12 +1465,39 @@ const API_URL = window.location.hostname === 'localhost'
 
           if (!res.ok) throw new Error('Upload failed');
 
-          alert('Document uploaded successfully!');
+          showMessage('Document uploaded successfully!', 'success');
           setShowUploadDoc(false);
           setUploadFile(null);
           setUploadTransaction(null);
           await loadTransactions(selectedProduct.id);
-        } catch (err) { alert(err.message); }
+        } catch (err) { showMessage(err.message, 'error'); }
+      };
+
+      const handleDeleteDocument = async (transactionId) => {
+        try {
+          await apiCall(`/inventory-transactions/${transactionId}/document`, { method: 'DELETE' });
+          showMessage('Document deleted successfully!', 'success');
+          await loadTransactions(selectedProduct.id);
+        } catch (err) { showMessage(err.message, 'error'); }
+      };
+
+      const handleDownloadDocument = async (documentId, fileName) => {
+        try {
+          const response = await fetch(`${API_URL}/documents/download/${documentId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
+          
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName || 'document';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        } catch (err) { showMessage(`Download error: ${err.message}`, 'error'); }
       };
 
       const openProductDetails = async (product) => {
@@ -986,8 +1506,7 @@ const API_URL = window.location.hostname === 'localhost'
       };
 
       const filteredProducts = products.filter(p => {
-        const matchesSearch = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                             (p.vendor && p.vendor.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesSearch = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesRack = !rackFilter || p.rack_id === rackFilter;
         return matchesSearch && matchesRack;
       });
@@ -1012,7 +1531,7 @@ const API_URL = window.location.hostname === 'localhost'
 
             <div className="bg-white rounded-lg shadow p-6 mb-6">
               <h1 className="text-2xl font-bold text-gray-800 mb-2">{selectedProduct.name}</h1>
-              <p className="text-gray-600 mb-4">Vendor: {selectedProduct.vendor || 'N/A'} | Rack: {selectedProduct.rack_id || 'N/A'}</p>
+              <p className="text-gray-600 mb-4">Rack: {selectedProduct.rack_id || 'N/A'}</p>
 
               <div className="grid grid-cols-4 gap-4 mb-4">
                 <div className="bg-blue-50 p-4 rounded">
@@ -1097,9 +1616,31 @@ const API_URL = window.location.hostname === 'localhost'
                           <td className="px-6 py-4 text-sm">{t.reference_no || '-'}</td>
                           <td className="px-6 py-4 text-sm">
                             {t.document_path ? (
-                              <a href={`${API_URL}${t.document_path}`} target="_blank" className="text-blue-600 hover:underline">View</a>
+                              <div className="flex items-center gap-3">
+                                <button onClick={() => handleDownloadDocument(t.document_id, t.document_name)} title="Download Document" className="text-blue-600 hover:text-blue-800 transition">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    showMessage('Delete this document?', 'confirm', () => handleDeleteDocument(t.id));
+                                  }} 
+                                  title="Delete Document"
+                                  className="text-red-600 hover:text-red-800 transition">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
                             ) : (
-                              <button onClick={() => { setUploadTransaction(t); setShowUploadDoc(true); }} className="text-blue-600 hover:underline">Upload</button>
+                              <button onClick={() => { setUploadTransaction(t); setShowUploadDoc(true); }} title="Upload Document" className="text-green-600 hover:text-green-800 transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.3A4.5 4.5 0 1113.5 13H11V9.413l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13H5.5z" />
+                                </svg>
+                              </button>
                             )}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-600">{t.notes || '-'}</td>
@@ -1277,7 +1818,6 @@ const API_URL = window.location.hostname === 'localhost'
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sell Price (₹)</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Cost (₹)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
@@ -1285,7 +1825,7 @@ const API_URL = window.location.hostname === 'localhost'
               <tbody className="divide-y divide-gray-200">
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                       {products.length === 0 ? (
                         <div>
                           <p className="text-lg font-medium mb-2">No products yet</p>
@@ -1307,7 +1847,6 @@ const API_URL = window.location.hostname === 'localhost'
                       </td>
                       <td className="px-6 py-4">₹{p.sell_price}</td>
                       <td className="px-6 py-4">₹{p.purchase_price.toFixed(2)}</td>
-                      <td className="px-6 py-4 text-gray-600">{p.vendor || '-'}</td>
                       <td className="px-6 py-4 text-gray-600">{p.rack_id || '-'}</td>
                       <td className="px-6 py-4">
                         <button onClick={(e) => { e.stopPropagation(); openProductDetails(p); }} className="text-blue-600 hover:text-blue-800">
@@ -1343,10 +1882,6 @@ const API_URL = window.location.hostname === 'localhost'
                       <input type="number" step="0.01" value={productForm.sell_price} onChange={e => setProductForm({...productForm, sell_price: e.target.value})} className="w-full px-3 py-2 border rounded" required />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Vendor</label>
-                      <input value={productForm.vendor} onChange={e => setProductForm({...productForm, vendor: e.target.value})} className="w-full px-3 py-2 border rounded" />
-                    </div>
-                    <div>
                       <label className="block text-sm font-medium mb-1">Rack ID</label>
                       <input value={productForm.rack_id} onChange={e => setProductForm({...productForm, rack_id: e.target.value})} className="w-full px-3 py-2 border rounded" placeholder="e.g., A-1, B-2" />
                     </div>
@@ -1360,6 +1895,56 @@ const API_URL = window.location.hostname === 'localhost'
                     <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Product</button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Popup Component */}
+          {showModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div className={`p-6 border-b flex items-start gap-4 ${
+                  modalType === 'error' ? 'border-red-300 bg-red-50' :
+                  modalType === 'success' ? 'border-green-300 bg-green-50' :
+                  modalType === 'confirm' ? 'border-blue-300 bg-blue-50' :
+                  'border-blue-300 bg-blue-50'
+                }`}>
+                  <div className={`flex-shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-white ${
+                    modalType === 'error' ? 'bg-red-500' :
+                    modalType === 'success' ? 'bg-green-500' :
+                    modalType === 'confirm' ? 'bg-blue-500' :
+                    'bg-blue-500'
+                  }`}>
+                    {modalType === 'error' && '!'}
+                    {modalType === 'success' && '✓'}
+                    {(modalType === 'info' || modalType === 'confirm') && 'i'}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-700">{modalMessage}</p>
+                  </div>
+                </div>
+                <div className="p-6 flex gap-3">
+                  {modalType === 'confirm' ? (
+                    <>
+                      <button 
+                        onClick={() => { setShowModal(false); }} 
+                        className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={() => { if (modalAction) modalAction(); setShowModal(false); }} 
+                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                        Confirm
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={() => setShowModal(false)} 
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                      OK
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -2346,10 +2931,12 @@ const API_URL = window.location.hostname === 'localhost'
     function App() {
       const { isAuthenticated, logout, user } = React.useContext(AuthContext);
       const [current, setCurrent] = useState('dashboard');
+      const [menuCollapsed, setMenuCollapsed] = useState(false);
       if (!isAuthenticated) return <Login />;
 
       const menu = [
         { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+        { id: 'reminders', label: 'Reminders', icon: '🔔' },
         { id: 'customers', label: 'Customers', icon: '👥' },
         { id: 'stock', label: 'Stock Management', icon: '📦' },
         { id: 'jobcards', label: 'Job Cards', icon: '🔧' },
@@ -2359,16 +2946,25 @@ const API_URL = window.location.hostname === 'localhost'
 
       return (
         <div className="flex h-screen bg-gray-50 overflow-hidden">
-          <aside className="w-64 bg-white shadow-lg relative">
+          <aside className={`${menuCollapsed ? 'w-16' : 'w-64'} bg-white shadow-lg relative transition-all`}>
             <div className="p-6 border-b">
-              <h1 className="text-2xl font-bold text-blue-600">Retail Manager</h1>
-              <p className="text-sm text-gray-600 mt-1">Welcome, {user?.username || 'User'}</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className={`text-2xl font-bold text-blue-600 ${menuCollapsed ? 'hidden' : ''}`}>Retail Manager</h1>
+                  <p className={`text-sm text-gray-600 mt-1 ${menuCollapsed ? 'hidden' : ''}`}>Welcome, {user?.username || 'User'}</p>
+                </div>
+                <button onClick={() => setMenuCollapsed(c => !c)} className="text-gray-600 hover:text-gray-900">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <nav className="p-4">
               {menu.map(m => (
                 <button key={m.id} onClick={() => setCurrent(m.id)} className={`w-full text-left px-4 py-3 mb-2 rounded-lg flex items-center gap-3 ${current===m.id ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>
                   <span className="text-xl">{m.icon}</span>
-                  <span className="font-medium">{m.label}</span>
+                  <span className={`${menuCollapsed ? 'hidden' : 'font-medium'}`}>{m.label}</span>
                 </button>
               ))}
             </nav>
@@ -2385,6 +2981,7 @@ const API_URL = window.location.hostname === 'localhost'
 
             <section className="flex-1 overflow-auto p-6">
               {current === 'dashboard' && <Dashboard />}
+              {current === 'reminders' && <Reminders />}
               {current === 'customers' && <Customers />}
               {current === 'stock' && <StockManagement />}
               {current === 'jobcards' && <JobCards />}

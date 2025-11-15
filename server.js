@@ -79,6 +79,16 @@ function initializeDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Call Logs table
+    db.run(`CREATE TABLE IF NOT EXISTS call_logs (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      note TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_by TEXT,
+      FOREIGN KEY (customer_id) REFERENCES customers(id)
+    )`);
+
     // Products table (Master Data - no quantity or purchase price here)
     db.run(`CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
@@ -263,6 +273,19 @@ function initializeDatabase() {
                     console.log('✅ Admin user created/verified');
                   }
                 });
+      
+          // Add call_logs table if not exists
+          db.run(`CREATE TABLE IF NOT EXISTS call_logs (
+            id TEXT PRIMARY KEY,
+            customer_id TEXT NOT NULL,
+            note TEXT NOT NULL,
+            created_by TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (customer_id) REFERENCES customers(id)
+          )`, (err) => {
+            if (err) console.error('Error creating call_logs table:', err);
+            else console.log('✅ call_logs table created/verified');
+          });
       }
     });
   });
@@ -384,6 +407,67 @@ app.delete('/api/customers/:id', authenticateToken, (req, res) => {
       return res.status(500).json({ error: err.message });
     }
     res.json({ message: 'Customer deleted successfully' });
+  });
+});
+
+// Call logs for a customer
+app.get('/api/customers/:id/call-logs', authenticateToken, (req, res) => {
+  const customerId = req.params.id;
+  db.all('SELECT id, note, created_by, created_at FROM call_logs WHERE customer_id = ? ORDER BY created_at DESC', [customerId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
+app.post('/api/customers/:id/call-logs', authenticateToken, (req, res) => {
+  const customerId = req.params.id;
+  const { note } = req.body;
+  if (!note || !note.trim()) return res.status(400).json({ error: 'Note is required' });
+  const id = uuidv4();
+  db.run('INSERT INTO call_logs (id, customer_id, note, created_by) VALUES (?, ?, ?, ?)', [id, customerId, note.trim(), req.user.username], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ id, message: 'Call note saved' });
+  });
+});
+
+// Service history for a customer derived from job cards
+app.get('/api/customers/:id/service-history', authenticateToken, (req, res) => {
+  const customerId = req.params.id;
+
+  db.all(`SELECT * FROM job_cards WHERE customer_id = ? ORDER BY created_at DESC LIMIT 200`, [customerId], (err, jobCards) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!jobCards || jobCards.length === 0) return res.json([]);
+
+    // For each job card, get tasks and stock items
+    const detailPromises = jobCards.map(jc => {
+      return new Promise((resolve, reject) => {
+        db.all('SELECT id, task_description, status, created_at FROM job_card_tasks WHERE job_card_id = ? ORDER BY created_at', [jc.id], (err, tasks) => {
+          if (err) return reject(err);
+          db.all(`SELECT jcs.id, jcs.product_id, jcs.quantity, jcs.unit_price, jcs.total_price, p.name as product_name
+                  FROM job_card_stock_items jcs
+                  LEFT JOIN products p ON jcs.product_id = p.id
+                  WHERE jcs.job_card_id = ? ORDER BY jcs.created_at`, [jc.id], (err, stockItems) => {
+            if (err) return reject(err);
+            resolve({
+              id: jc.id,
+              job_number: jc.job_number,
+              status: jc.status,
+              assignee: jc.assignee,
+              notes: jc.notes,
+              labour_charge: jc.labour_charge,
+              created_at: jc.created_at,
+              closed_at: jc.closed_at,
+              tasks: tasks || [],
+              stock_items: stockItems || []
+            });
+          });
+        });
+      });
+    });
+
+    Promise.all(detailPromises)
+      .then(results => res.json(results))
+      .catch(err => res.status(500).json({ error: err.message }));
   });
 });
 
@@ -604,14 +688,55 @@ app.get('/api/documents/:entityType/:entityId', authenticateToken, (req, res) =>
   );
 });
 
+// Delete document and file for a transaction
+app.delete('/api/inventory-transactions/:transactionId/document', authenticateToken, (req, res) => {
+  const { transactionId } = req.params;
+  
+  db.get('SELECT file_path FROM documents WHERE related_entity_id = ? AND related_entity_type = ?', 
+    [transactionId, 'INVENTORY_TRANSACTION'], 
+    (err, row) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      
+      if (!row) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Delete file from disk
+      if (fs.existsSync(row.file_path)) {
+        fs.unlinkSync(row.file_path);
+      }
+
+      // Delete record from database
+      db.run('DELETE FROM documents WHERE related_entity_id = ? AND related_entity_type = ?',
+        [transactionId, 'INVENTORY_TRANSACTION'],
+        (err) => {
+          if (err) {
+            return res.status(500).json({ error: err.message });
+          }
+          res.json({ message: 'Document deleted successfully' });
+        }
+      );
+    }
+  );
+});
+
 // Download document
 app.get('/api/documents/download/:id', authenticateToken, (req, res) => {
   db.get('SELECT * FROM documents WHERE id = ?', [req.params.id], (err, doc) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: err.message });
     }
     if (!doc) {
       return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    // Check if file exists
+    if (!fs.existsSync(doc.file_path)) {
+      console.error('File not found:', doc.file_path);
+      return res.status(404).json({ error: 'File not found on disk' });
     }
     
     res.download(doc.file_path, doc.file_name);
@@ -810,7 +935,29 @@ app.get('/api/dashboard/stats', authenticateToken, (req, res) => {
               db.get('SELECT COUNT(*) as count FROM services WHERE status = "active"', [], (err, result) => {
                 stats.active_services = result.count;
 
-                res.json(stats);
+                            // Upcoming services (next 7 days)
+                            db.all(`SELECT id, name, phone, next_service_date FROM customers WHERE next_service_date BETWEEN date('now') AND date('now', '+7 days') ORDER BY next_service_date`, [], (err, upcomingRows) => {
+                              if (err) {
+                                stats.upcoming_services = [];
+                                stats.upcoming_count = 0;
+                              } else {
+                                stats.upcoming_services = upcomingRows;
+                                stats.upcoming_count = upcomingRows.length;
+                              }
+
+                              // Overdue services (past 7 days)
+                              db.all(`SELECT id, name, phone, next_service_date FROM customers WHERE next_service_date BETWEEN date('now', '-7 days') AND date('now', '-1 day') ORDER BY next_service_date`, [], (err, overdueRows) => {
+                                if (err) {
+                                  stats.overdue_services = [];
+                                  stats.overdue_count = 0;
+                                } else {
+                                  stats.overdue_services = overdueRows;
+                                  stats.overdue_count = overdueRows.length;
+                                }
+
+                                res.json(stats);
+                              });
+                            });
               });
             });
           });
@@ -1205,12 +1352,11 @@ app.post('/api/job-cards/:id/complete', authenticateToken, (req, res) => {
         return res.status(404).json({ error: 'Job card not found' });
       }
 
-      // Update job card status, labour charge, and discount
+      // Update job card status, labour charge, and discount (NO billed_at)
       db.run(`
         UPDATE job_cards 
         SET status = 'closed', 
             closed_at = CURRENT_TIMESTAMP, 
-            billed_at = CURRENT_TIMESTAMP,
             labour_charge = ?,
             discount = ?
         WHERE id = ?
@@ -1219,33 +1365,49 @@ app.post('/api/job-cards/:id/complete', authenticateToken, (req, res) => {
           return res.status(500).json({ error: err.message });
         }
 
-        // Update customer service dates if provided
-        if (last_service_date || next_service_date) {
-          let updateQuery = 'UPDATE customers SET ';
-          const updateParams = [];
-          const updates = [];
-          
-          if (last_service_date) {
-            updates.push('last_service_date = ?');
-            updateParams.push(last_service_date);
+        // Auto-delete call logs for this customer when job card is completed
+        db.run(`DELETE FROM call_logs WHERE customer_id = ?`, [row.customer_id], (err) => {
+          if (err) {
+            console.error('Error deleting call logs:', err);
           }
-          
-          if (next_service_date) {
-            updates.push('next_service_date = ?');
-            updateParams.push(next_service_date);
-          }
-          
-          updateQuery += updates.join(', ') + ' WHERE id = ?';
-          updateParams.push(row.customer_id);
-          
-          db.run(updateQuery, updateParams, (err) => {
-            if (err) {
-              console.error('Error updating service dates:', err);
-            }
-          });
-        }
+        });
 
-        res.json({ message: 'Job card completed and billed successfully' });
+        // Auto-populate service dates if not provided
+        const today = new Date();
+        const formatDate = (d) => d.toISOString().split('T')[0];
+        let finalLastService = last_service_date || formatDate(today);
+        
+        // Default next service = today + 3 months
+        const addMonths = (date, months) => {
+          const d = new Date(date);
+          const nm = new Date(d.setMonth(d.getMonth() + months));
+          return nm;
+        };
+        let finalNextService = next_service_date || formatDate(addMonths(today, 3));
+
+        // If next service falls on Saturday (6), add one day
+        try {
+          const nsDate = new Date(finalNextService);
+          if (nsDate.getDay() === 6) {
+            nsDate.setDate(nsDate.getDate() + 1);
+            finalNextService = formatDate(nsDate);
+          }
+        } catch (e) { /* ignore parse errors */ }
+
+        // Always update customer with final service dates
+        db.run(`
+          UPDATE customers SET last_service_date = ?, next_service_date = ? WHERE id = ?
+        `, [finalLastService, finalNextService, row.customer_id], (err) => {
+          if (err) {
+            console.error('Error updating service dates:', err);
+          }
+        });
+
+        res.json({ 
+          message: 'Job card completed successfully', 
+          last_service_date: finalLastService,
+          next_service_date: finalNextService
+        });
       });
     });
   });
