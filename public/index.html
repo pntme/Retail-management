@@ -1931,8 +1931,14 @@ const API_URL = window.location.hostname === 'localhost'
                         className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">
                         Cancel
                       </button>
-                      <button 
-                        onClick={() => { if (modalAction) modalAction(); setShowModal(false); }} 
+                      <button
+                        onClick={() => {
+                          if (modalAction) {
+                            const action = modalAction();
+                            if (action) action();
+                          }
+                          setShowModal(false);
+                        }}
                         className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
                         Confirm
                       </button>
