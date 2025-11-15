@@ -2362,6 +2362,180 @@ app.get('/api/reports/profit-loss', authenticateToken, (req, res) => {
   );
 });
 
+// ==================== USER GUIDE ROUTE ====================
+
+// Serve user guide as HTML
+app.get('/user-guide', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+
+  const guidePath = path.join(__dirname, 'USER_GUIDE.md');
+
+  fs.readFile(guidePath, 'utf8', (err, data) => {
+    if (err) {
+      return res.status(404).send('User guide not found');
+    }
+
+    // Convert markdown to HTML-friendly format (basic conversion)
+    let html = data
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+      .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+      .replace(/^#### (.*$)/gm, '<h4>$1</h4>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/^\- (.*$)/gm, '<li>$1</li>')
+      .replace(/^(\d+)\. (.*$)/gm, '<li>$2</li>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/^---$/gm, '<hr>');
+
+    const fullHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Retail Management System - User Guide</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      border-radius: 8px;
+    }
+    h1 {
+      color: #2563eb;
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 10px;
+      margin: 30px 0 20px 0;
+      font-size: 2em;
+    }
+    h2 {
+      color: #1e40af;
+      margin: 25px 0 15px 0;
+      font-size: 1.5em;
+      border-left: 4px solid #2563eb;
+      padding-left: 15px;
+    }
+    h3 {
+      color: #1e3a8a;
+      margin: 20px 0 10px 0;
+      font-size: 1.2em;
+    }
+    h4 {
+      color: #475569;
+      margin: 15px 0 8px 0;
+      font-size: 1.1em;
+    }
+    p {
+      margin: 10px 0;
+      text-align: justify;
+    }
+    ul, ol {
+      margin: 10px 0 10px 30px;
+    }
+    li {
+      margin: 5px 0;
+    }
+    code {
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      color: #dc2626;
+    }
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 15px;
+      border-radius: 5px;
+      overflow-x: auto;
+      margin: 15px 0;
+    }
+    strong {
+      color: #1e40af;
+      font-weight: 600;
+    }
+    hr {
+      border: none;
+      border-top: 2px solid #e5e7eb;
+      margin: 30px 0;
+    }
+    .back-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #2563eb;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      text-decoration: none;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      transition: background 0.3s;
+    }
+    .back-btn:hover {
+      background: #1e40af;
+    }
+    .print-btn {
+      position: fixed;
+      top: 20px;
+      right: 140px;
+      background: #059669;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      text-decoration: none;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      cursor: pointer;
+      border: none;
+      font-size: 14px;
+    }
+    .print-btn:hover {
+      background: #047857;
+    }
+    @media print {
+      .back-btn, .print-btn { display: none; }
+      .container { box-shadow: none; padding: 20px; }
+    }
+    @media (max-width: 768px) {
+      body { padding: 10px; }
+      .container { padding: 20px; }
+      h1 { font-size: 1.5em; }
+      h2 { font-size: 1.3em; }
+      .back-btn { top: 10px; right: 10px; padding: 8px 15px; font-size: 12px; }
+      .print-btn { top: 10px; right: 110px; padding: 8px 15px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">🖨️ Print Guide</button>
+  <a href="/" class="back-btn">← Back to App</a>
+  <div class="container">
+    <p>${html}</p>
+  </div>
+</body>
+</html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(fullHtml);
+  });
+});
+
 // ==================== START SERVER ====================
 
 app.listen(PORT, () => {
