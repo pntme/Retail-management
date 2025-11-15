@@ -521,16 +521,88 @@ const API_URL = window.location.hostname === 'localhost'
                 <button onClick={() => window.print()} className="px-3 py-2 bg-gray-200 rounded">Print</button>
               </div>
               <SectionLoader loading={loadingServiceHistory} message="Loading service history...">
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {serviceHistory.length === 0 ? (
                     <div className="text-gray-500">No service history available.</div>
                   ) : (
                     serviceHistory.map((s, i) => (
-                      <div key={i} className="p-3 border rounded">
-                        <div className="text-sm text-gray-600">Date</div>
-                        <div className="font-medium">{new Date(s.date).toLocaleString()}</div>
-                        <div className="text-sm text-gray-600 mt-2">Notes</div>
-                        <div>{s.notes}</div>
+                      <div key={i} className="p-4 border rounded bg-white shadow-sm">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <div className="font-semibold text-lg">{s.job_number}</div>
+                            <div className="text-sm text-gray-600">
+                              {s.created_at && new Date(s.created_at).toLocaleDateString('en-IN', {
+                                year: 'numeric', month: 'long', day: 'numeric'
+                              })}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-2 py-1 text-xs rounded ${s.status === 'closed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                              {s.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {s.tasks && s.tasks.length > 0 && (
+                          <div className="mb-3">
+                            <div className="text-sm font-medium text-gray-700 mb-1">Services Performed:</div>
+                            <ul className="list-disc list-inside text-sm text-gray-600">
+                              {s.tasks.map((task, idx) => (
+                                <li key={idx}>{task.task_description}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {s.stock_items && s.stock_items.length > 0 && (
+                          <div className="mb-3">
+                            <div className="text-sm font-medium text-gray-700 mb-1">Parts Used:</div>
+                            <div className="text-sm text-gray-600">
+                              {s.stock_items.map((item, idx) => (
+                                <div key={idx}>• {item.product_name} (Qty: {item.quantity})</div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {s.bills && s.bills.length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <div className="text-sm font-medium text-gray-700 mb-2">Bills:</div>
+                            {s.bills.map((bill, idx) => (
+                              <div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded mb-2">
+                                <div>
+                                  <div className="font-medium text-sm">{bill.bill_number}</div>
+                                  <div className="text-xs text-gray-600">
+                                    {new Date(bill.bill_date).toLocaleDateString('en-IN')} • ₹{bill.total.toFixed(2)}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <span className={`px-2 py-0.5 text-xs rounded ${bill.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                    {bill.payment_status.toUpperCase()}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      const token = localStorage.getItem('token');
+                                      const url = `${API_URL}/bills/${bill.id}/view?token=${encodeURIComponent(token)}`;
+                                      window.open(url, '_blank');
+                                    }}
+                                    className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                  >
+                                    View Bill
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {s.notes && (
+                          <div className="mt-3 pt-3 border-t">
+                            <div className="text-sm text-gray-600">
+                              <strong>Notes:</strong> {s.notes}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
@@ -832,16 +904,88 @@ const API_URL = window.location.hostname === 'localhost'
                 <button onClick={() => window.print()} className="px-3 py-2 bg-gray-200 rounded">Print</button>
               </div>
               <SectionLoader loading={loadingServiceHistory} message="Loading service history...">
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {serviceHistory.length === 0 ? (
                     <div className="text-gray-500">No service history available.</div>
                   ) : (
                     serviceHistory.map((s, i) => (
-                      <div key={i} className="p-3 border rounded">
-                        <div className="text-sm text-gray-600">Date</div>
-                        <div className="font-medium">{new Date(s.date).toLocaleString()}</div>
-                        <div className="text-sm text-gray-600 mt-2">Notes</div>
-                        <div>{s.notes}</div>
+                      <div key={i} className="p-4 border rounded bg-white shadow-sm">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <div className="font-semibold text-lg">{s.job_number}</div>
+                            <div className="text-sm text-gray-600">
+                              {s.created_at && new Date(s.created_at).toLocaleDateString('en-IN', {
+                                year: 'numeric', month: 'long', day: 'numeric'
+                              })}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className={`px-2 py-1 text-xs rounded ${s.status === 'closed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                              {s.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {s.tasks && s.tasks.length > 0 && (
+                          <div className="mb-3">
+                            <div className="text-sm font-medium text-gray-700 mb-1">Services Performed:</div>
+                            <ul className="list-disc list-inside text-sm text-gray-600">
+                              {s.tasks.map((task, idx) => (
+                                <li key={idx}>{task.task_description}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {s.stock_items && s.stock_items.length > 0 && (
+                          <div className="mb-3">
+                            <div className="text-sm font-medium text-gray-700 mb-1">Parts Used:</div>
+                            <div className="text-sm text-gray-600">
+                              {s.stock_items.map((item, idx) => (
+                                <div key={idx}>• {item.product_name} (Qty: {item.quantity})</div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {s.bills && s.bills.length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <div className="text-sm font-medium text-gray-700 mb-2">Bills:</div>
+                            {s.bills.map((bill, idx) => (
+                              <div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded mb-2">
+                                <div>
+                                  <div className="font-medium text-sm">{bill.bill_number}</div>
+                                  <div className="text-xs text-gray-600">
+                                    {new Date(bill.bill_date).toLocaleDateString('en-IN')} • ₹{bill.total.toFixed(2)}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <span className={`px-2 py-0.5 text-xs rounded ${bill.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                    {bill.payment_status.toUpperCase()}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      const token = localStorage.getItem('token');
+                                      const url = `${API_URL}/bills/${bill.id}/view?token=${encodeURIComponent(token)}`;
+                                      window.open(url, '_blank');
+                                    }}
+                                    className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                  >
+                                    View Bill
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {s.notes && (
+                          <div className="mt-3 pt-3 border-t">
+                            <div className="text-sm text-gray-600">
+                              <strong>Notes:</strong> {s.notes}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

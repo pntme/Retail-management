@@ -537,7 +537,20 @@ app.post('/api/customers', authenticateToken, (req, res) => {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
-      res.json({ id, message: 'Customer created successfully' });
+      // Return the full customer object
+      res.json({
+        id,
+        name,
+        email,
+        phone,
+        address,
+        credit_limit: credit_limit || 0,
+        vehicle_type,
+        vehicle_number,
+        last_service_date,
+        next_service_date,
+        message: 'Customer created successfully'
+      });
     }
   );
 });
@@ -595,7 +608,7 @@ app.get('/api/customers/:id/service-history', authenticateToken, (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!jobCards || jobCards.length === 0) return res.json([]);
 
-    // For each job card, get tasks and stock items
+    // For each job card, get tasks, stock items, and bill info
     const detailPromises = jobCards.map(jc => {
       return new Promise((resolve, reject) => {
         db.all('SELECT id, task_description, status, created_at FROM job_card_tasks WHERE job_card_id = ? ORDER BY created_at', [jc.id], (err, tasks) => {
@@ -605,17 +618,24 @@ app.get('/api/customers/:id/service-history', authenticateToken, (req, res) => {
                   LEFT JOIN products p ON jcs.product_id = p.id
                   WHERE jcs.job_card_id = ? ORDER BY jcs.created_at`, [jc.id], (err, stockItems) => {
             if (err) return reject(err);
-            resolve({
-              id: jc.id,
-              job_number: jc.job_number,
-              status: jc.status,
-              assignee: jc.assignee,
-              notes: jc.notes,
-              labour_charge: jc.labour_charge,
-              created_at: jc.created_at,
-              closed_at: jc.closed_at,
-              tasks: tasks || [],
-              stock_items: stockItems || []
+
+            // Get bill info for this job card
+            db.all('SELECT id, bill_number, bill_date, total, payment_status FROM bills WHERE job_card_id = ? ORDER BY bill_date DESC', [jc.id], (err, bills) => {
+              if (err) return reject(err);
+
+              resolve({
+                id: jc.id,
+                job_number: jc.job_number,
+                status: jc.status,
+                assignee: jc.assignee,
+                notes: jc.notes,
+                labour_charge: jc.labour_charge,
+                created_at: jc.created_at,
+                closed_at: jc.closed_at,
+                tasks: tasks || [],
+                stock_items: stockItems || [],
+                bills: bills || []
+              });
             });
           });
         });
