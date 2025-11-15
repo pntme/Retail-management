@@ -528,47 +528,106 @@ app.get('/api/customers', authenticateToken, (req, res) => {
 
 app.post('/api/customers', authenticateToken, (req, res) => {
   const { name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date } = req.body;
-  const id = uuidv4();
 
-  db.run(
-    'INSERT INTO customers (id, name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, name, email, phone, address, credit_limit || 0, vehicle_type, vehicle_number, last_service_date, next_service_date],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
+  // Check if vehicle number already exists (if provided)
+  if (vehicle_number && vehicle_number.trim()) {
+    db.get(
+      'SELECT id, name, phone FROM customers WHERE vehicle_number = ?',
+      [vehicle_number.trim()],
+      (err, existingCustomer) => {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+
+        if (existingCustomer) {
+          return res.status(400).json({
+            error: 'Vehicle number already exists',
+            message: `This vehicle number is already registered to ${existingCustomer.name} (${existingCustomer.phone}). Please search with vehicle number to find the existing customer.`,
+            existing_customer: existingCustomer
+          });
+        }
+
+        // No duplicate found, proceed with creation
+        createCustomer();
       }
-      // Return the full customer object
-      res.json({
-        id,
-        name,
-        email,
-        phone,
-        address,
-        credit_limit: credit_limit || 0,
-        vehicle_type,
-        vehicle_number,
-        last_service_date,
-        next_service_date,
-        message: 'Customer created successfully'
-      });
-    }
-  );
+    );
+  } else {
+    // No vehicle number provided, create directly
+    createCustomer();
+  }
+
+  function createCustomer() {
+    const id = uuidv4();
+
+    db.run(
+      'INSERT INTO customers (id, name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, name, email, phone, address, credit_limit || 0, vehicle_type, vehicle_number, last_service_date, next_service_date],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+        // Return the full customer object
+        res.json({
+          id,
+          name,
+          email,
+          phone,
+          address,
+          credit_limit: credit_limit || 0,
+          vehicle_type,
+          vehicle_number,
+          last_service_date,
+          next_service_date,
+          message: 'Customer created successfully'
+        });
+      }
+    );
+  }
 });
 
 app.put('/api/customers/:id', authenticateToken, (req, res) => {
   const { name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date } = req.body;
   const { id } = req.params;
 
-  db.run(
-    'UPDATE customers SET name = ?, email = ?, phone = ?, address = ?, credit_limit = ?, vehicle_type = ?, vehicle_number = ?, last_service_date = ?, next_service_date = ? WHERE id = ?',
-    [name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date, id],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
+  // Check if vehicle number already exists (excluding current customer)
+  if (vehicle_number && vehicle_number.trim()) {
+    db.get(
+      'SELECT id, name, phone FROM customers WHERE vehicle_number = ? AND id != ?',
+      [vehicle_number.trim(), id],
+      (err, existingCustomer) => {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+
+        if (existingCustomer) {
+          return res.status(400).json({
+            error: 'Vehicle number already exists',
+            message: `This vehicle number is already registered to ${existingCustomer.name} (${existingCustomer.phone}). Please search with vehicle number to find the existing customer.`,
+            existing_customer: existingCustomer
+          });
+        }
+
+        // No duplicate found, proceed with update
+        updateCustomer();
       }
-      res.json({ message: 'Customer updated successfully' });
-    }
-  );
+    );
+  } else {
+    // No vehicle number provided, update directly
+    updateCustomer();
+  }
+
+  function updateCustomer() {
+    db.run(
+      'UPDATE customers SET name = ?, email = ?, phone = ?, address = ?, credit_limit = ?, vehicle_type = ?, vehicle_number = ?, last_service_date = ?, next_service_date = ? WHERE id = ?',
+      [name, email, phone, address, credit_limit, vehicle_type, vehicle_number, last_service_date, next_service_date, id],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: err.message });
+        }
+        res.json({ message: 'Customer updated successfully' });
+      }
+    );
+  }
 });
 
 app.delete('/api/customers/:id', authenticateToken, (req, res) => {
