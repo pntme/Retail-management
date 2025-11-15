@@ -98,7 +98,7 @@ const API_URL = window.location.hostname === 'localhost'
       );
     }
 
-    function ConfirmModal({ title, message, onConfirm, onCancel }) {
+    function ConfirmModal({ title, message, onConfirm, onCancel, loading = false }) {
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-md w-full relative">
@@ -106,8 +106,8 @@ const API_URL = window.location.hostname === 'localhost'
               <h2 className="text-2xl font-bold mb-4">{title}</h2>
               <p className="text-gray-700 mb-6">{message}</p>
               <div className="flex gap-3 justify-end">
-                <button onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition">Cancel</button>
-                <button onClick={onConfirm} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</button>
+                <button onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition" disabled={loading}>Cancel</button>
+                <ButtonLoader loading={loading} onClick={onConfirm} className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition">Delete</ButtonLoader>
               </div>
             </div>
           </div>
@@ -128,6 +128,66 @@ const API_URL = window.location.hostname === 'localhost'
       );
     }
 
+    // Spinner component for loading states
+    function Spinner({ size = 'md', color = 'blue' }) {
+      const sizeClasses = {
+        sm: 'w-4 h-4 border-2',
+        md: 'w-8 h-8 border-3',
+        lg: 'w-12 h-12 border-4',
+        xl: 'w-16 h-16 border-4'
+      };
+      const colorClasses = {
+        blue: 'border-blue-600 border-t-transparent',
+        white: 'border-white border-t-transparent',
+        gray: 'border-gray-600 border-t-transparent',
+        green: 'border-green-600 border-t-transparent',
+        red: 'border-red-600 border-t-transparent'
+      };
+      return (
+        <div className={`${sizeClasses[size]} ${colorClasses[color]} rounded-full animate-spin`}></div>
+      );
+    }
+
+    // Full-page loading overlay
+    function LoadingOverlay({ message = 'Loading...', show = true }) {
+      if (!show) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-8 rounded-lg shadow-2xl flex flex-col items-center space-y-4">
+            <Spinner size="xl" />
+            <p className="text-gray-700 font-medium text-lg">{message}</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Inline loader for buttons
+    function ButtonLoader({ loading, children, ...props }) {
+      return (
+        <button {...props} disabled={loading || props.disabled}>
+          {loading ? (
+            <div className="flex items-center justify-center gap-2">
+              <Spinner size="sm" color="white" />
+              <span>Loading...</span>
+            </div>
+          ) : children}
+        </button>
+      );
+    }
+
+    // Section loader for content areas
+    function SectionLoader({ loading, children, message = 'Loading...' }) {
+      if (loading) {
+        return (
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <Spinner size="lg" />
+            <p className="text-gray-600">{message}</p>
+          </div>
+        );
+      }
+      return children;
+    }
+
     // ------------------ Customers component (enhanced) ------------------
     function Customers() {
       const [customers, setCustomers] = useState([]);
@@ -138,6 +198,13 @@ const API_URL = window.location.hostname === 'localhost'
       const [viewCustomer, setViewCustomer] = useState(null);
       const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
       const [deleteId, setDeleteId] = useState(null);
+
+      // Loading states
+      const [loadingCustomers, setLoadingCustomers] = useState(false);
+      const [submitting, setSubmitting] = useState(false);
+      const [deleting, setDeleting] = useState(false);
+      const [loadingServiceHistory, setLoadingServiceHistory] = useState(false);
+      const [creatingJobCard, setCreatingJobCard] = useState(false);
 
       // pagination
       const [page, setPage] = useState(1);
@@ -165,11 +232,13 @@ const API_URL = window.location.hostname === 'localhost'
       useEffect(() => { loadCustomers(); }, [search]);
 
       const loadCustomers = async () => {
+        setLoadingCustomers(true);
         try {
           const data = await apiCall(`/customers?search=${encodeURIComponent(search)}`);
           setCustomers(data || []);
           setPage(1);
         } catch (err) { console.error(err); }
+        finally { setLoadingCustomers(false); }
       };
 
       const normalizeVehicleNumber = (value) => {
@@ -202,6 +271,7 @@ const API_URL = window.location.hostname === 'localhost'
       const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validateForm()) return;
+        setSubmitting(true);
         try {
           if (editing) {
             await apiCall(`/customers/${editing.id}`, { method: 'PUT', body: JSON.stringify(form) });
@@ -210,13 +280,15 @@ const API_URL = window.location.hostname === 'localhost'
           }
           setShowForm(false); setEditing(null); setForm(initialForm); loadCustomers();
         } catch (err) { alert(err.message); }
+        finally { setSubmitting(false); }
       };
 
       const handleDelete = async (id) => { setDeleteId(id); setShowDeleteConfirm(true); };
 
       const confirmDelete = async () => {
+        setDeleting(true);
         try { await apiCall(`/customers/${deleteId}`, { method: 'DELETE' }); loadCustomers(); } catch (err) { alert(err.message); }
-        setShowDeleteConfirm(false); setDeleteId(null);
+        finally { setDeleting(false); setShowDeleteConfirm(false); setDeleteId(null); }
       };
 
       const cancelDelete = () => { setShowDeleteConfirm(false); setDeleteId(null); };
@@ -225,6 +297,7 @@ const API_URL = window.location.hostname === 'localhost'
 
       // service history
       const openServiceHistory = async (customer) => {
+        setLoadingServiceHistory(true);
         try {
           const data = await apiCall(`/customers/${customer.id}/service-history`);
           setServiceHistory(data || []);
@@ -232,7 +305,7 @@ const API_URL = window.location.hostname === 'localhost'
           console.warn('service history not available via API, using empty list', err);
           setServiceHistory([]);
         }
-        setShowServiceHistory(true);
+        finally { setLoadingServiceHistory(false); setShowServiceHistory(true); }
       };
 
       // job card quick-create (simple inline modal)
@@ -247,11 +320,13 @@ const API_URL = window.location.hostname === 'localhost'
         if (!jcCustomer) return alert('No customer selected');
         const tasks = jcTasks.map(t => t.trim()).filter(Boolean);
         if (tasks.length === 0) return alert('Add at least one task');
+        setCreatingJobCard(true);
         try {
           await apiCall('/job-cards', { method: 'POST', body: JSON.stringify({ customer_id: jcCustomer.id, vehicle_number: jcVehicle, tasks }) });
           setShowCreateJobCard(false); setJcCustomer(null); setJcVehicle(''); setJcTasks(['']);
           alert('Job card created');
         } catch (err) { alert(err.message); }
+        finally { setCreatingJobCard(false); }
       };
 
       // call logs inside view modal (readonly - just display)
@@ -304,21 +379,22 @@ const API_URL = window.location.hostname === 'localhost'
           </div>
 
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="w-full overflow-x-auto">
-              <table className="min-w-[900px] w-full table-auto">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle No.</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {pagedCustomers.map(c => (
+            <SectionLoader loading={loadingCustomers} message="Loading customers...">
+              <div className="w-full overflow-x-auto">
+                <table className="min-w-[900px] w-full table-auto">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle No.</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {pagedCustomers.map(c => (
                     <tr key={c.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
@@ -368,10 +444,11 @@ const API_URL = window.location.hostname === 'localhost'
                       <td className="px-6 py-4 whitespace-nowrap font-mono">{c.vehicle_number || '-'}</td>
                       <td className="px-6 py-4 whitespace-nowrap max-w-sm overflow-hidden text-ellipsis">{c.address || '-'}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SectionLoader>
           </div>
 
           {/* pagination */}
@@ -429,8 +506,8 @@ const API_URL = window.location.hostname === 'localhost'
                 </div>
 
                 <div className="flex justify-end gap-3 mt-4">
-                  <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">{editing ? 'Update' : 'Create'}</button>
+                  <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="px-4 py-2 border rounded hover:bg-gray-50" disabled={submitting}>Cancel</button>
+                  <ButtonLoader loading={submitting} type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">{editing ? 'Update' : 'Create'}</ButtonLoader>
                 </div>
               </form>
             </Modal>
@@ -443,22 +520,26 @@ const API_URL = window.location.hostname === 'localhost'
                 <h2 className="text-2xl font-bold">Service History</h2>
                 <button onClick={() => window.print()} className="px-3 py-2 bg-gray-200 rounded">Print</button>
               </div>
-              <div className="space-y-3">
-                {serviceHistory.length === 0 ? (
-                  <div className="text-gray-500">No service history available.</div>
-                ) : (
-                  serviceHistory.map((s, i) => (
-                    <div key={i} className="p-3 border rounded">
-                      <div className="text-sm text-gray-600">Date</div>
-                      <div className="font-medium">{new Date(s.date).toLocaleString()}</div>
-                      <div className="text-sm text-gray-600 mt-2">Notes</div>
-                      <div>{s.notes}</div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <SectionLoader loading={loadingServiceHistory} message="Loading service history...">
+                <div className="space-y-3">
+                  {serviceHistory.length === 0 ? (
+                    <div className="text-gray-500">No service history available.</div>
+                  ) : (
+                    serviceHistory.map((s, i) => (
+                      <div key={i} className="p-3 border rounded">
+                        <div className="text-sm text-gray-600">Date</div>
+                        <div className="font-medium">{new Date(s.date).toLocaleString()}</div>
+                        <div className="text-sm text-gray-600 mt-2">Notes</div>
+                        <div>{s.notes}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </SectionLoader>
             </Modal>
           )}
+
+          {loadingServiceHistory && <LoadingOverlay message="Loading service history..." />}
 
           {/* Create Job Card inline modal */}
           {showCreateJobCard && (
@@ -477,11 +558,11 @@ const API_URL = window.location.hostname === 'localhost'
                       {jcTasks.length>1 && <button onClick={()=>setJcTasks(prev=>prev.filter((_,i)=>i!==idx))} className="px-3 py-2 bg-red-600 text-white rounded">Remove</button>}
                     </div>
                   ))}
-                  <button onClick={()=>setJcTasks(prev=>[...prev,''])} className="px-3 py-2 bg-gray-600 text-white rounded">+ Add Task</button>
+                  <button onClick={()=>setJcTasks(prev=>[...prev,''])} className="px-3 py-2 bg-gray-600 text-white rounded" disabled={creatingJobCard}>+ Add Task</button>
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={createJobCardInline} className="flex-1 px-4 py-2 bg-green-600 text-white rounded">Create</button>
-                  <button onClick={()=>setShowCreateJobCard(false)} className="flex-1 px-4 py-2 border rounded">Cancel</button>
+                  <ButtonLoader loading={creatingJobCard} onClick={createJobCardInline} className="flex-1 px-4 py-2 bg-green-600 text-white rounded">Create</ButtonLoader>
+                  <button onClick={()=>setShowCreateJobCard(false)} className="flex-1 px-4 py-2 border rounded" disabled={creatingJobCard}>Cancel</button>
                 </div>
               </div>
             </Modal>
@@ -537,11 +618,12 @@ const API_URL = window.location.hostname === 'localhost'
 
           {/* Delete Confirmation Modal */}
           {showDeleteConfirm && (
-            <ConfirmModal 
+            <ConfirmModal
               title="Delete Customer"
               message="Are you sure you want to delete this customer? This action cannot be undone."
               onConfirm={confirmDelete}
               onCancel={cancelDelete}
+              loading={deleting}
             />
           )}
         </div>
@@ -565,6 +647,12 @@ const API_URL = window.location.hostname === 'localhost'
       const [page, setPage] = useState(1);
       const pageSize = 12;
 
+      // Loading states
+      const [loadingCustomers, setLoadingCustomers] = useState(false);
+      const [loadingServiceHistory, setLoadingServiceHistory] = useState(false);
+      const [loadingCallLogs, setLoadingCallLogs] = useState(false);
+      const [addingCallNote, setAddingCallNote] = useState(false);
+
       // service history modal
       const [showServiceHistory, setShowServiceHistory] = useState(false);
       const [serviceHistory, setServiceHistory] = useState([]);
@@ -578,11 +666,13 @@ const API_URL = window.location.hostname === 'localhost'
       useEffect(() => { loadCustomers(); }, []);
 
       const loadCustomers = async () => {
+        setLoadingCustomers(true);
         try {
           const data = await apiCall('/customers');
           setCustomers(data || []);
           setPage(1);
         } catch (err) { console.error(err); }
+        finally { setLoadingCustomers(false); }
       };
 
       const getReminders = () => {
@@ -596,6 +686,7 @@ const API_URL = window.location.hostname === 'localhost'
       };
 
       const openServiceHistory = async (customer) => {
+        setLoadingServiceHistory(true);
         try {
           const data = await apiCall(`/customers/${customer.id}/service-history`);
           setServiceHistory(data || []);
@@ -603,10 +694,11 @@ const API_URL = window.location.hostname === 'localhost'
           console.warn('service history not available', err);
           setServiceHistory([]);
         }
-        setShowServiceHistory(true);
+        finally { setLoadingServiceHistory(false); setShowServiceHistory(true); }
       };
 
       const openCallLogs = async (customer) => {
+        setLoadingCallLogs(true);
         try {
           const data = await apiCall(`/customers/${customer.id}/call-logs`);
           setCallLogs(data || []);
@@ -614,20 +706,21 @@ const API_URL = window.location.hostname === 'localhost'
           console.warn('call logs not available', err);
           setCallLogs([]);
         }
-        setCallLogsCustomer(customer);
-        setShowCallLogs(true);
+        finally { setLoadingCallLogs(false); setCallLogsCustomer(customer); setShowCallLogs(true); }
       };
 
       const addCallNote = async () => {
         if (!newCallNote.trim() || !callLogsCustomer) return;
+        setAddingCallNote(true);
         const note = { note: newCallNote.trim(), created_at: new Date().toISOString() };
         setCallLogs(prev => [note, ...prev]);
         setNewCallNote('');
-        try { 
-          await apiCall(`/customers/${callLogsCustomer.id}/call-logs`, { method: 'POST', body: JSON.stringify(note) }); 
-        } catch (e) { 
-          console.warn('Failed to persist call note', e); 
+        try {
+          await apiCall(`/customers/${callLogsCustomer.id}/call-logs`, { method: 'POST', body: JSON.stringify(note) });
+        } catch (e) {
+          console.warn('Failed to persist call note', e);
         }
+        finally { setAddingCallNote(false); }
       };
 
       const reminders = getReminders();
@@ -656,67 +749,69 @@ const API_URL = window.location.hostname === 'localhost'
           </div>
 
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="w-full overflow-x-auto">
-              <table className="min-w-[900px] w-full table-auto">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next Service Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {pagedReminders.map(r => {
-                    const serviceDate = new Date(r.next_service_date);
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-                    const daysUntil = Math.ceil((serviceDate.getTime() - today.getTime()) / (1000*60*60*24));
-                    const isPast = daysUntil < 0;
-                    const statusText = isPast ? `Overdue for ${Math.abs(daysUntil)} days` : `Upcoming service in ${daysUntil} days`;
-                    const statusColor = isPast ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
-                    
-                    return (
-                      <tr key={r.id} className={`${isPast ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50'}`}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            {/* service history */}
-                            <button 
-                              title="Service History" 
-                              onClick={() => { const c = customers.find(x=>x.id===r.id); if(c) openServiceHistory(c); }} 
-                              className="text-indigo-600 hover:text-indigo-800">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M8 2a1 1 0 011 1v1h2V3a1 1 0 112 0v1h1a2 2 0 012 2v1H3V6a2 2 0 012-2h1V3a1 1 0 011-1z" />
-                                <path d="M3 9h14v6a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                              </svg>
-                            </button>
+            <SectionLoader loading={loadingCustomers} message="Loading reminders...">
+              <div className="w-full overflow-x-auto">
+                <table className="min-w-[900px] w-full table-auto">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next Service Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {pagedReminders.map(r => {
+                      const serviceDate = new Date(r.next_service_date);
+                      const today = new Date();
+                      today.setHours(0,0,0,0);
+                      const daysUntil = Math.ceil((serviceDate.getTime() - today.getTime()) / (1000*60*60*24));
+                      const isPast = daysUntil < 0;
+                      const statusText = isPast ? `Overdue for ${Math.abs(daysUntil)} days` : `Upcoming service in ${daysUntil} days`;
+                      const statusColor = isPast ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800';
 
-                            {/* call logs */}
-                            <button 
-                              title="Call Logs" 
-                              onClick={() => { const c = customers.find(x=>x.id===r.id); if(c) openCallLogs(c); }} 
-                              className="text-green-600 hover:text-green-800">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773c.058.3.102.605.102.92v1.972c0 .78.545 1.437 1.276 1.782.58.305 1.316.309 1.896 0 .76-.397 1.276-1.002 1.276-1.782V8.004c0-.315.044-.62.102-.92l-1.548-.773a1 1 0 01-.54-1.06l.74-4.435A1 1 0 0110.848 2h2.153a1 1 0 011 1v2a1 1 0 11-2 0V3h-2v2a1 1 0 11-2 0V3H4v2a1 1 0 11-2 0V3z" />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap font-medium">{r.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap"><a href={`tel:${r.phone}`} className="text-blue-600 hover:underline">{r.phone}</a></td>
-                        <td className="px-6 py-4 whitespace-nowrap">{serviceDate.toLocaleDateString()}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColor}`}>
-                            {statusText}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                      return (
+                        <tr key={r.id} className={`${isPast ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50'}`}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              {/* service history */}
+                              <button
+                                title="Service History"
+                                onClick={() => { const c = customers.find(x=>x.id===r.id); if(c) openServiceHistory(c); }}
+                                className="text-indigo-600 hover:text-indigo-800">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M8 2a1 1 0 011 1v1h2V3a1 1 0 112 0v1h1a2 2 0 012 2v1H3V6a2 2 0 012-2h1V3a1 1 0 011-1z" />
+                                  <path d="M3 9h14v6a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                </svg>
+                              </button>
+
+                              {/* call logs */}
+                              <button
+                                title="Call Logs"
+                                onClick={() => { const c = customers.find(x=>x.id===r.id); if(c) openCallLogs(c); }}
+                                className="text-green-600 hover:text-green-800">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773c.058.3.102.605.102.92v1.972c0 .78.545 1.437 1.276 1.782.58.305 1.316.309 1.896 0 .76-.397 1.276-1.002 1.276-1.782V8.004c0-.315.044-.62.102-.92l-1.548-.773a1 1 0 01-.54-1.06l.74-4.435A1 1 0 0110.848 2h2.153a1 1 0 011 1v2a1 1 0 11-2 0V3h-2v2a1 1 0 11-2 0V3H4v2a1 1 0 11-2 0V3z" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap font-medium">{r.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap"><a href={`tel:${r.phone}`} className="text-blue-600 hover:underline">{r.phone}</a></td>
+                          <td className="px-6 py-4 whitespace-nowrap">{serviceDate.toLocaleDateString()}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColor}`}>
+                              {statusText}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </SectionLoader>
           </div>
 
           {/* pagination */}
@@ -736,20 +831,22 @@ const API_URL = window.location.hostname === 'localhost'
                 <h2 className="text-2xl font-bold">Service History</h2>
                 <button onClick={() => window.print()} className="px-3 py-2 bg-gray-200 rounded">Print</button>
               </div>
-              <div className="space-y-3">
-                {serviceHistory.length === 0 ? (
-                  <div className="text-gray-500">No service history available.</div>
-                ) : (
-                  serviceHistory.map((s, i) => (
-                    <div key={i} className="p-3 border rounded">
-                      <div className="text-sm text-gray-600">Date</div>
-                      <div className="font-medium">{new Date(s.date).toLocaleString()}</div>
-                      <div className="text-sm text-gray-600 mt-2">Notes</div>
-                      <div>{s.notes}</div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <SectionLoader loading={loadingServiceHistory} message="Loading service history...">
+                <div className="space-y-3">
+                  {serviceHistory.length === 0 ? (
+                    <div className="text-gray-500">No service history available.</div>
+                  ) : (
+                    serviceHistory.map((s, i) => (
+                      <div key={i} className="p-3 border rounded">
+                        <div className="text-sm text-gray-600">Date</div>
+                        <div className="font-medium">{new Date(s.date).toLocaleString()}</div>
+                        <div className="text-sm text-gray-600 mt-2">Notes</div>
+                        <div>{s.notes}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </SectionLoader>
             </Modal>
           )}
 
@@ -761,35 +858,39 @@ const API_URL = window.location.hostname === 'localhost'
                 <div className="bg-blue-50 p-3 rounded border border-blue-200">
                   <label className="text-sm font-medium block mb-2">Add New Call Log</label>
                   <div className="flex gap-2">
-                    <input 
-                      value={newCallNote} 
-                      onChange={e => setNewCallNote(e.target.value)} 
-                      placeholder="Enter call notes..." 
-                      className="flex-1 px-3 py-2 border rounded" 
+                    <input
+                      value={newCallNote}
+                      onChange={e => setNewCallNote(e.target.value)}
+                      placeholder="Enter call notes..."
+                      className="flex-1 px-3 py-2 border rounded"
+                      disabled={addingCallNote}
                     />
-                    <button 
-                      onClick={addCallNote} 
+                    <ButtonLoader
+                      loading={addingCallNote}
+                      onClick={addCallNote}
                       className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                       Add
-                    </button>
+                    </ButtonLoader>
                   </div>
                 </div>
 
                 <div className="border-t pt-3">
                   <h3 className="text-sm font-semibold mb-2">Call History</h3>
-                  <div className="max-h-96 overflow-y-auto">
-                    {callLogs.length === 0 ? (
-                      <div className="text-sm text-gray-500 p-3">No call logs yet</div>
-                    ) : (
-                      callLogs.map((log, idx) => (
-                        <div key={idx} className="p-3 border rounded bg-gray-50 mb-2">
-                          <div className="text-xs text-gray-500">{new Date(log.created_at).toLocaleString()}</div>
-                          <div className="text-sm text-gray-600 mt-1">By: {log.created_by || 'Unknown'}</div>
-                          <div className="mt-2 text-sm">{log.note || log.notes}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <SectionLoader loading={loadingCallLogs} message="Loading call logs...">
+                    <div className="max-h-96 overflow-y-auto">
+                      {callLogs.length === 0 ? (
+                        <div className="text-sm text-gray-500 p-3">No call logs yet</div>
+                      ) : (
+                        callLogs.map((log, idx) => (
+                          <div key={idx} className="p-3 border rounded bg-gray-50 mb-2">
+                            <div className="text-xs text-gray-500">{new Date(log.created_at).toLocaleString()}</div>
+                            <div className="text-sm text-gray-600 mt-1">By: {log.created_by || 'Unknown'}</div>
+                            <div className="mt-2 text-sm">{log.note || log.notes}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </SectionLoader>
                 </div>
               </div>
             </Modal>
@@ -801,7 +902,22 @@ const API_URL = window.location.hostname === 'localhost'
 
     function Dashboard() {
       const [stats, setStats] = useState(null);
-      useEffect(() => { (async () => { try { const d = await apiCall('/dashboard/stats'); setStats(d); } catch (e) { console.error(e); } })(); }, []);
+      const [loadingStats, setLoadingStats] = useState(false);
+
+      useEffect(() => {
+        (async () => {
+          setLoadingStats(true);
+          try {
+            const d = await apiCall('/dashboard/stats');
+            setStats(d);
+          } catch (e) {
+            console.error(e);
+          } finally {
+            setLoadingStats(false);
+          }
+        })();
+      }, []);
+
       return (
         <div>
           <div className="flex items-center justify-between mb-6">
@@ -809,86 +925,88 @@ const API_URL = window.location.hostname === 'localhost'
             <div className="text-sm text-gray-600">Welcome back — {new Date().toLocaleDateString()}</div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-gray-500">Today's Sales</div>
-                  <div className="text-2xl font-bold mt-1">₹{(stats?.today_sales ?? 0).toFixed(2)}</div>
+          <SectionLoader loading={loadingStats} message="Loading dashboard statistics...">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="bg-white p-6 rounded-lg shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-gray-500">Today's Sales</div>
+                    <div className="text-2xl font-bold mt-1">₹{(stats?.today_sales ?? 0).toFixed(2)}</div>
+                  </div>
+                  <div className="text-3xl">💰</div>
                 </div>
-                <div className="text-3xl">💰</div>
+                <div className="mt-4 text-sm text-gray-500">Transactions: {stats?.today_transactions ?? 0}</div>
               </div>
-              <div className="mt-4 text-sm text-gray-500">Transactions: {stats?.today_transactions ?? 0}</div>
+
+              <div className="bg-white p-6 rounded-lg shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-gray-500">Total Customers</div>
+                    <div className="text-2xl font-bold mt-1">{stats?.total_customers ?? 0}</div>
+                  </div>
+                  <div className="text-3xl">👥</div>
+                </div>
+                <div className="mt-4 text-sm text-gray-500">Active services: {stats?.active_services ?? 0}</div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-gray-500">Low Stock Items</div>
+                    <div className="text-2xl font-bold mt-1">{stats?.low_stock_items ?? 0}</div>
+                  </div>
+                  <div className="text-3xl">⚠️</div>
+                </div>
+                <div className="mt-4 text-sm text-gray-500">Monthly Sales: ₹{(stats?.monthly_sales ?? 0).toFixed(2)}</div>
+              </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-gray-500">Total Customers</div>
-                  <div className="text-2xl font-bold mt-1">{stats?.total_customers ?? 0}</div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-lg shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold">Upcoming Services (Next 7 days)</h3>
+                  <div className="text-sm text-gray-500">{stats?.upcoming_count ?? 0} customers</div>
                 </div>
-                <div className="text-3xl">👥</div>
-              </div>
-              <div className="mt-4 text-sm text-gray-500">Active services: {stats?.active_services ?? 0}</div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-gray-500">Low Stock Items</div>
-                  <div className="text-2xl font-bold mt-1">{stats?.low_stock_items ?? 0}</div>
-                </div>
-                <div className="text-3xl">⚠️</div>
-              </div>
-              <div className="mt-4 text-sm text-gray-500">Monthly Sales: ₹{(stats?.monthly_sales ?? 0).toFixed(2)}</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold">Upcoming Services (Next 7 days)</h3>
-                <div className="text-sm text-gray-500">{stats?.upcoming_count ?? 0} customers</div>
-              </div>
-              {stats?.upcoming_services && stats.upcoming_services.length > 0 ? (
-                <div className="space-y-3">
-                  {stats.upcoming_services.slice(0,10).map(s => (
-                    <div key={s.id} className="p-3 border rounded flex justify-between items-center">
-                      <div>
-                        <div className="font-medium">{s.name}</div>
-                        <div className="text-sm text-gray-500">{s.phone} • {new Date(s.next_service_date).toLocaleDateString()}</div>
+                {stats?.upcoming_services && stats.upcoming_services.length > 0 ? (
+                  <div className="space-y-3">
+                    {stats.upcoming_services.slice(0,10).map(s => (
+                      <div key={s.id} className="p-3 border rounded flex justify-between items-center">
+                        <div>
+                          <div className="font-medium">{s.name}</div>
+                          <div className="text-sm text-gray-500">{s.phone} • {new Date(s.next_service_date).toLocaleDateString()}</div>
+                        </div>
+                        <div className="text-sm text-blue-600">View</div>
                       </div>
-                      <div className="text-sm text-blue-600">View</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">No upcoming services in next 7 days</div>
-              )}
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold">Overdue Services (Past 7 days)</h3>
-                <div className="text-sm text-gray-500">{stats?.overdue_count ?? 0} customers</div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">No upcoming services in next 7 days</div>
+                )}
               </div>
-              {stats?.overdue_services && stats.overdue_services.length > 0 ? (
-                <div className="space-y-3">
-                  {stats.overdue_services.slice(0,10).map(s => (
-                    <div key={s.id} className="p-3 border rounded flex justify-between items-center">
-                      <div>
-                        <div className="font-medium">{s.name}</div>
-                        <div className="text-sm text-gray-500">{s.phone} • {new Date(s.next_service_date).toLocaleDateString()}</div>
-                      </div>
-                      <div className="text-sm text-red-600">Overdue</div>
-                    </div>
-                  ))}
+
+              <div className="bg-white p-6 rounded-lg shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold">Overdue Services (Past 7 days)</h3>
+                  <div className="text-sm text-gray-500">{stats?.overdue_count ?? 0} customers</div>
                 </div>
-              ) : (
-                <div className="text-sm text-gray-500">No overdue services in past 7 days</div>
-              )}
+                {stats?.overdue_services && stats.overdue_services.length > 0 ? (
+                  <div className="space-y-3">
+                    {stats.overdue_services.slice(0,10).map(s => (
+                      <div key={s.id} className="p-3 border rounded flex justify-between items-center">
+                        <div>
+                          <div className="font-medium">{s.name}</div>
+                          <div className="text-sm text-gray-500">{s.phone} • {new Date(s.next_service_date).toLocaleDateString()}</div>
+                        </div>
+                        <div className="text-sm text-red-600">Overdue</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">No overdue services in past 7 days</div>
+                )}
+              </div>
             </div>
-          </div>
+          </SectionLoader>
         </div>
       );
     }
@@ -909,6 +1027,13 @@ const API_URL = window.location.hostname === 'localhost'
       const [showHistory, setShowHistory] = useState(false);
       const [historyProduct, setHistoryProduct] = useState(null);
       const [transactions, setTransactions] = useState([]);
+
+      // Loading states
+      const [loadingProducts, setLoadingProducts] = useState(false);
+      const [submitting, setSubmitting] = useState(false);
+      const [deleting, setDeleting] = useState(false);
+      const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+      const [deleteId, setDeleteId] = useState(null);
 
       const initialForm = {
         name: '',
@@ -934,14 +1059,16 @@ const API_URL = window.location.hostname === 'localhost'
       }, [products, searchTerm, rackFilter]);
 
       const loadProducts = async () => {
+        setLoadingProducts(true);
         try {
           const data = await apiCall('/products');
           setProducts(data);
-          
+
           // Extract unique rack IDs
           const racks = [...new Set(data.map(p => p.rack_id).filter(r => r))].sort();
           setAllRacks(racks);
         } catch (err) { console.error(err); }
+        finally { setLoadingProducts(false); }
       };
 
       const filterProducts = () => {
@@ -994,6 +1121,7 @@ const API_URL = window.location.hostname === 'localhost'
       const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validateForm()) return;
+        setSubmitting(true);
         try {
           const payload = {
             name: form.name,
@@ -1010,12 +1138,18 @@ const API_URL = window.location.hostname === 'localhost'
           }
           setShowForm(false); setEditing(null); setForm(initialForm); loadProducts();
         } catch (err) { alert(err.message); }
+        finally { setSubmitting(false); }
       };
 
-      const handleDelete = async (id) => {
-        if (!confirm('Delete this product?')) return;
-        try { await apiCall(`/products/${id}`, { method: 'DELETE' }); loadProducts(); } catch (err) { alert(err.message); }
+      const handleDelete = async (id) => { setDeleteId(id); setShowDeleteConfirm(true); };
+
+      const confirmDelete = async () => {
+        setDeleting(true);
+        try { await apiCall(`/products/${deleteId}`, { method: 'DELETE' }); loadProducts(); } catch (err) { alert(err.message); }
+        finally { setDeleting(false); setShowDeleteConfirm(false); setDeleteId(null); }
       };
+
+      const cancelDelete = () => { setShowDeleteConfirm(false); setDeleteId(null); };
 
       const handleView = (product) => { setViewProduct(product); setShowView(true); };
 
@@ -1099,65 +1233,67 @@ const API_URL = window.location.hostname === 'localhost'
           </div>
 
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="w-full overflow-x-auto">
-              <table className="min-w-[1100px] w-full table-auto">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Sell Price (₹)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Purchase Price (₹)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Purchase (₹)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expected Total Sell (₹)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack ID</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredProducts.map(p => {
-                    const { totalPurchasePrice, expectedTotalSellPrice } = calculateTotals(p);
-                    return (
-                      <tr key={p.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <button title="View" onClick={() => handleView(p)} className="text-gray-600 hover:text-gray-900">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7S3.732 16.057 2.458 12z" />
-                              </svg>
-                            </button>
-                            <button title="Edit" onClick={() => openEdit(p)} className="text-blue-600 hover:text-blue-800">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M17.414 2.586a2 2 0 010 2.828L8.414 14.414a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464L14.586 2.586a2 2 0 012.828 0z" />
-                              </svg>
-                            </button>
-                            <button title="Delete" onClick={() => handleDelete(p.id)} className="text-red-600 hover:text-red-800">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H3a1 1 0 100 2h14a1 1 0 100-2h-2V3a1 1 0 00-1-1H6zm2 6a1 1 0 10-2 0v7a1 1 0 102 0V8zm6 0a1 1 0 10-2 0v7a1 1 0 102 0V8z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap max-w-xs overflow-hidden text-ellipsis font-medium">{p.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">₹{parseFloat(p.sell_price).toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{p.quantity}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">₹{parseFloat(p.purchase_price).toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap font-medium text-orange-600">₹{totalPurchasePrice.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap font-medium text-green-600">₹{expectedTotalSellPrice.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">{p.rack_id || '-'}</td>
-                      </tr>
-                    );
-                  })}
-                  {filteredProducts.length === 0 && (
+            <SectionLoader loading={loadingProducts} message="Loading products...">
+              <div className="w-full overflow-x-auto">
+                <table className="min-w-[1100px] w-full table-auto">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
-                        No products found. {searchTerm || rackFilter ? 'Try adjusting your filters.' : 'Add your first product to get started.'}
-                      </td>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Sell Price (₹)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Purchase Price (₹)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Purchase (₹)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expected Total Sell (₹)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack ID</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredProducts.map(p => {
+                      const { totalPurchasePrice, expectedTotalSellPrice } = calculateTotals(p);
+                      return (
+                        <tr key={p.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <button title="View" onClick={() => handleView(p)} className="text-gray-600 hover:text-gray-900">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.065 7-9.542 7S3.732 16.057 2.458 12z" />
+                                </svg>
+                              </button>
+                              <button title="Edit" onClick={() => openEdit(p)} className="text-blue-600 hover:text-blue-800">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M17.414 2.586a2 2 0 010 2.828L8.414 14.414a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464L14.586 2.586a2 2 0 012.828 0z" />
+                                </svg>
+                              </button>
+                              <button title="Delete" onClick={() => handleDelete(p.id)} className="text-red-600 hover:text-red-800">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H3a1 1 0 100 2h14a1 1 0 100-2h-2V3a1 1 0 00-1-1H6zm2 6a1 1 0 10-2 0v7a1 1 0 102 0V8zm6 0a1 1 0 10-2 0v7a1 1 0 102 0V8z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap max-w-xs overflow-hidden text-ellipsis font-medium">{p.name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">₹{parseFloat(p.sell_price).toFixed(2)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{p.quantity}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">₹{parseFloat(p.purchase_price).toFixed(2)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-medium text-orange-600">₹{totalPurchasePrice.toFixed(2)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap font-medium text-green-600">₹{expectedTotalSellPrice.toFixed(2)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{p.rack_id || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                    {filteredProducts.length === 0 && (
+                      <tr>
+                        <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
+                          No products found. {searchTerm || rackFilter ? 'Try adjusting your filters.' : 'Add your first product to get started.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </SectionLoader>
           </div>
 
           {/* Create / Edit Modal */}
@@ -1219,8 +1355,8 @@ const API_URL = window.location.hostname === 'localhost'
                 </div>
 
                 <div className="flex justify-end gap-3 mt-4">
-                  <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">{editing ? 'Update' : 'Create'}</button>
+                  <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="px-4 py-2 border rounded hover:bg-gray-50" disabled={submitting}>Cancel</button>
+                  <ButtonLoader loading={submitting} type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">{editing ? 'Update' : 'Create'}</ButtonLoader>
                 </div>
               </form>
             </Modal>
@@ -1262,6 +1398,17 @@ const API_URL = window.location.hostname === 'localhost'
               </div>
             </Modal>
           )}
+
+          {/* Delete Confirmation Modal */}
+          {showDeleteConfirm && (
+            <ConfirmModal
+              title="Delete Product"
+              message="Are you sure you want to delete this product? This action cannot be undone."
+              onConfirm={confirmDelete}
+              onCancel={cancelDelete}
+              loading={deleting}
+            />
+          )}
         </div>
       );
     }
@@ -1296,7 +1443,15 @@ const API_URL = window.location.hostname === 'localhost'
       const [searchTerm, setSearchTerm] = useState('');
       const [rackFilter, setRackFilter] = useState('');
       const [allRacks, setAllRacks] = useState([]);
-      
+
+      // Loading states
+      const [loadingProducts, setLoadingProducts] = useState(false);
+      const [loadingTransactions, setLoadingTransactions] = useState(false);
+      const [submittingProduct, setSubmittingProduct] = useState(false);
+      const [submittingPurchase, setSubmittingPurchase] = useState(false);
+      const [submittingAdjustment, setSubmittingAdjustment] = useState(false);
+      const [uploadingDocument, setUploadingDocument] = useState(false);
+
       // Modal state for alerts and confirmations
       const [modalMessage, setModalMessage] = useState('');
       const [modalType, setModalType] = useState('info'); // 'info', 'error', 'success', 'confirm'
@@ -1321,15 +1476,18 @@ const API_URL = window.location.hostname === 'localhost'
       useEffect(() => { loadProducts(); }, []);
 
       const loadProducts = async () => {
+        setLoadingProducts(true);
         try {
           const data = await apiCall('/products');
           setProducts(data);
           const racks = [...new Set(data.map(p => p.rack_id).filter(r => r))].sort();
           setAllRacks(racks);
         } catch (err) { console.error(err); }
+        finally { setLoadingProducts(false); }
       };
 
       const loadTransactions = async (productId) => {
+        setLoadingTransactions(true);
         try {
           const data = await apiCall(`/inventory-transactions/product/${productId}`);
           // Fetch documents for all transactions
@@ -1347,6 +1505,7 @@ const API_URL = window.location.hostname === 'localhost'
           }));
           setTransactions(merged);
         } catch (err) { console.error(err); }
+        finally { setLoadingTransactions(false); }
       };
 
       // Helper function to show modal messages
@@ -1361,7 +1520,8 @@ const API_URL = window.location.hostname === 'localhost'
         e.preventDefault();
         if (!productForm.name.trim()) { showMessage('Product name is required', 'error'); return; }
         if (!productForm.sell_price || parseFloat(productForm.sell_price) <= 0) { showMessage('Valid sell price is required', 'error'); return; }
-        
+
+        setSubmittingProduct(true);
         try {
           await apiCall('/products', {
             method: 'POST',
@@ -1376,13 +1536,15 @@ const API_URL = window.location.hostname === 'localhost'
           setProductForm({ name: '', sell_price: '', rack_id: '', additional_info: '' });
           loadProducts();
         } catch (err) { showMessage(err.message, 'error'); }
+        finally { setSubmittingProduct(false); }
       };
 
       const handleAddPurchase = async (e) => {
         e.preventDefault();
         if (!purchaseForm.quantity || parseInt(purchaseForm.quantity) <= 0) { showMessage('Valid quantity is required', 'error'); return; }
         if (!purchaseForm.unit_cost || parseFloat(purchaseForm.unit_cost) <= 0) { showMessage('Valid unit cost is required', 'error'); return; }
-        
+
+        setSubmittingPurchase(true);
         try {
           const requestData = {
             product_id: selectedProduct.id,
@@ -1412,19 +1574,21 @@ const API_URL = window.location.hostname === 'localhost'
 
           setShowAddPurchase(false);
           setPurchaseForm({ quantity: '', unit_cost: '', new_sell_price: '', vendor: '', reference_no: '', notes: '' });
-          
+
           // Reload product to get updated values
           const updatedProduct = await apiCall(`/products/${selectedProduct.id}`);
           setSelectedProduct(updatedProduct);
           await loadTransactions(selectedProduct.id);
           loadProducts();
         } catch (err) { alert(err.message); }
+        finally { setSubmittingPurchase(false); }
       };
 
       const handleAdjustment = async (e) => {
         e.preventDefault();
         if (!adjustmentForm.quantity || parseInt(adjustmentForm.quantity) <= 0) { showMessage('Valid quantity is required', 'error'); return; }
-        
+
+        setSubmittingAdjustment(true);
         try {
           await apiCall('/inventory-transactions', {
             method: 'POST',
@@ -1437,12 +1601,13 @@ const API_URL = window.location.hostname === 'localhost'
           });
           setShowAdjustment(false);
           setAdjustmentForm({ type: 'ADJUSTMENT_OUT', quantity: '', reason: 'DEFECTED', notes: '' });
-          
+
           const updatedProduct = await apiCall(`/products/${selectedProduct.id}`);
           setSelectedProduct(updatedProduct);
           await loadTransactions(selectedProduct.id);
           loadProducts();
         } catch (err) { alert(err.message); }
+        finally { setSubmittingAdjustment(false); }
       };
 
       const handleFileUpload = async (e) => {
@@ -1456,6 +1621,7 @@ const API_URL = window.location.hostname === 'localhost'
         formData.append('related_entity_id', uploadTransaction.id);
         formData.append('notes', '');
 
+        setUploadingDocument(true);
         try {
           const res = await fetch(`${API_URL}/documents/upload`, {
             method: 'POST',
@@ -1471,6 +1637,7 @@ const API_URL = window.location.hostname === 'localhost'
           setUploadTransaction(null);
           await loadTransactions(selectedProduct.id);
         } catch (err) { showMessage(err.message, 'error'); }
+        finally { setUploadingDocument(false); }
       };
 
       const handleDeleteDocument = async (transactionId) => {
@@ -1572,23 +1739,24 @@ const API_URL = window.location.hostname === 'localhost'
               <div className="p-6 border-b">
                 <h2 className="text-xl font-bold">Transaction History</h2>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Document</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
+              <SectionLoader loading={loadingTransactions} message="Loading transaction history...">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Document</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
                     {transactions.length === 0 ? (
                       <tr>
                         <td colSpan="10" className="px-6 py-8 text-center text-gray-500">
@@ -1647,9 +1815,10 @@ const API_URL = window.location.hostname === 'localhost'
                         </tr>
                       ))
                     )}
-                  </tbody>
-                </table>
-              </div>
+                    </tbody>
+                  </table>
+                </div>
+              </SectionLoader>
             </div>
 
             {showAddPurchase && (
@@ -1696,8 +1865,8 @@ const API_URL = window.location.hostname === 'localhost'
                       )}
                     </div>
                     <div className="flex gap-3 mt-6">
-                      <button type="button" onClick={() => setShowAddPurchase(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                      <button type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Add Purchase</button>
+                      <button type="button" onClick={() => setShowAddPurchase(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50" disabled={submittingPurchase}>Cancel</button>
+                      <ButtonLoader loading={submittingPurchase} type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Add Purchase</ButtonLoader>
                     </div>
                   </form>
                 </div>
@@ -1741,8 +1910,8 @@ const API_URL = window.location.hostname === 'localhost'
                       </div>
                     </div>
                     <div className="flex gap-3 mt-6">
-                      <button type="button" onClick={() => setShowAdjustment(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                      <button type="submit" className="flex-1 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">Adjust Stock</button>
+                      <button type="button" onClick={() => setShowAdjustment(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50" disabled={submittingAdjustment}>Cancel</button>
+                      <ButtonLoader loading={submittingAdjustment} type="submit" className="flex-1 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">Adjust Stock</ButtonLoader>
                     </div>
                   </form>
                 </div>
@@ -1771,8 +1940,8 @@ const API_URL = window.location.hostname === 'localhost'
                       )}
                     </div>
                     <div className="flex gap-3 mt-6">
-                      <button type="button" onClick={() => { setShowUploadDoc(false); setUploadFile(null); setUploadTransaction(null); }} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                      <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Upload</button>
+                      <button type="button" onClick={() => { setShowUploadDoc(false); setUploadFile(null); setUploadTransaction(null); }} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50" disabled={uploadingDocument}>Cancel</button>
+                      <ButtonLoader loading={uploadingDocument} type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Upload</ButtonLoader>
                     </div>
                   </form>
                 </div>
@@ -1811,53 +1980,55 @@ const API_URL = window.location.hostname === 'localhost'
           </div>
 
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sell Price (₹)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Cost (₹)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredProducts.length === 0 ? (
+            <SectionLoader loading={loadingProducts} message="Loading products...">
+              <table className="w-full">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
-                      {products.length === 0 ? (
-                        <div>
-                          <p className="text-lg font-medium mb-2">No products yet</p>
-                          <p className="text-sm">Click "Add Product" to get started</p>
-                        </div>
-                      ) : (
-                        <div>No products match your search</div>
-                      )}
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sell Price (₹)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Cost (₹)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
-                ) : (
-                  filteredProducts.map(p => (
-                    <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openProductDetails(p)}>
-                      <td className="px-6 py-4 font-medium text-blue-600">{p.name}</td>
-                      <td className="px-6 py-4">
-                        <span className={`font-bold ${p.quantity === 0 ? 'text-red-600' : p.quantity < 10 ? 'text-orange-600' : 'text-green-600'}`}>
-                          {p.quantity}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">₹{p.sell_price}</td>
-                      <td className="px-6 py-4">₹{p.purchase_price.toFixed(2)}</td>
-                      <td className="px-6 py-4 text-gray-600">{p.rack_id || '-'}</td>
-                      <td className="px-6 py-4">
-                        <button onClick={(e) => { e.stopPropagation(); openProductDetails(p); }} className="text-blue-600 hover:text-blue-800">
-                          View Details →
-                        </button>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredProducts.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                        {products.length === 0 ? (
+                          <div>
+                            <p className="text-lg font-medium mb-2">No products yet</p>
+                            <p className="text-sm">Click "Add Product" to get started</p>
+                          </div>
+                        ) : (
+                          <div>No products match your search</div>
+                        )}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredProducts.map(p => (
+                      <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openProductDetails(p)}>
+                        <td className="px-6 py-4 font-medium text-blue-600">{p.name}</td>
+                        <td className="px-6 py-4">
+                          <span className={`font-bold ${p.quantity === 0 ? 'text-red-600' : p.quantity < 10 ? 'text-orange-600' : 'text-green-600'}`}>
+                            {p.quantity}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">₹{p.sell_price}</td>
+                        <td className="px-6 py-4">₹{p.purchase_price.toFixed(2)}</td>
+                        <td className="px-6 py-4 text-gray-600">{p.rack_id || '-'}</td>
+                        <td className="px-6 py-4">
+                          <button onClick={(e) => { e.stopPropagation(); openProductDetails(p); }} className="text-blue-600 hover:text-blue-800">
+                            View Details →
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </SectionLoader>
           </div>
 
           <div className="mt-4 text-sm text-gray-600">
@@ -1891,8 +2062,8 @@ const API_URL = window.location.hostname === 'localhost'
                     </div>
                   </div>
                   <div className="flex gap-3 mt-6">
-                    <button type="button" onClick={() => setShowAddProduct(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Product</button>
+                    <button type="button" onClick={() => setShowAddProduct(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50" disabled={submittingProduct}>Cancel</button>
+                    <ButtonLoader loading={submittingProduct} type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Product</ButtonLoader>
                   </div>
                 </form>
               </div>
@@ -1970,6 +2141,14 @@ const API_URL = window.location.hostname === 'localhost'
       const [showRejectModal, setShowRejectModal] = useState(false);
       const [currentJobCard, setCurrentJobCard] = useState(null);
       const [products, setProducts] = useState([]);
+
+      // Loading states
+      const [loadingJobCards, setLoadingJobCards] = useState(false);
+      const [loadingJobCard, setLoadingJobCard] = useState(false);
+      const [creatingJobCard, setCreatingJobCard] = useState(false);
+      const [addingStockItem, setAddingStockItem] = useState(false);
+      const [completingJobCard, setCompletingJobCard] = useState(false);
+      const [rejectingJobCard, setRejectingJobCard] = useState(false);
       
       // Create job card form states
       const [customerSearch, setCustomerSearch] = useState('');
@@ -2004,6 +2183,7 @@ const API_URL = window.location.hostname === 'localhost'
       }, [jobCards, searchTerm, statusFilter]);
 
       const loadJobCards = async () => {
+        setLoadingJobCards(true);
         try {
           const response = await fetch(`${API_URL}/job-cards`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
@@ -2013,6 +2193,7 @@ const API_URL = window.location.hostname === 'localhost'
         } catch (error) {
           console.error('Error loading job cards:', error);
         }
+        finally { setLoadingJobCards(false); }
       };
 
       const loadProducts = async () => {
@@ -2079,18 +2260,19 @@ const API_URL = window.location.hostname === 'localhost'
           alert('Please select a customer');
           return;
         }
-        
+
         if (!vehicleNumber) {
           alert('Please enter vehicle number');
           return;
         }
-        
+
         const validTasks = tasks.filter(t => t.trim().length > 0);
         if (validTasks.length === 0) {
           alert('Please add at least one task');
           return;
         }
-        
+
+        setCreatingJobCard(true);
         try {
           const response = await fetch(`${API_URL}/job-cards`, {
             method: 'POST',
@@ -2106,7 +2288,7 @@ const API_URL = window.location.hostname === 'localhost'
               notes: notes || null
             })
           });
-          
+
           const data = await response.json();
           if (data.error) {
             alert(data.error);
@@ -2118,9 +2300,11 @@ const API_URL = window.location.hostname === 'localhost'
           console.error('Error creating job card:', error);
           alert('Failed to create job card');
         }
+        finally { setCreatingJobCard(false); }
       };
 
       const viewJobCard = async (id) => {
+        setLoadingJobCard(true);
         try {
           const response = await fetch(`${API_URL}/job-cards/${id}`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
@@ -2131,6 +2315,7 @@ const API_URL = window.location.hostname === 'localhost'
         } catch (error) {
           console.error('Error loading job card:', error);
         }
+        finally { setLoadingJobCard(false); }
       };
 
       const addStockItem = async () => {
@@ -2138,7 +2323,8 @@ const API_URL = window.location.hostname === 'localhost'
           alert('Please fill all required fields');
           return;
         }
-        
+
+        setAddingStockItem(true);
         try {
           const response = await fetch(`${API_URL}/job-cards/${currentJobCard.id}/stock-items`, {
             method: 'POST',
@@ -2153,7 +2339,7 @@ const API_URL = window.location.hostname === 'localhost'
               notes: stockNotes || null
             })
           });
-          
+
           const data = await response.json();
           if (data.error) {
             alert(data.error);
@@ -2166,9 +2352,11 @@ const API_URL = window.location.hostname === 'localhost'
           console.error('Error adding stock item:', error);
           alert('Failed to add stock item');
         }
+        finally { setAddingStockItem(false); }
       };
 
       const completeJobCard = async () => {
+        setCompletingJobCard(true);
         try {
           const response = await fetch(`${API_URL}/job-cards/${currentJobCard.id}/complete`, {
             method: 'POST',
@@ -2182,7 +2370,7 @@ const API_URL = window.location.hostname === 'localhost'
               next_service_date: nextServiceDate || null
             })
           });
-          
+
           const data = await response.json();
           if (data.error) {
             alert(data.error);
@@ -2195,6 +2383,7 @@ const API_URL = window.location.hostname === 'localhost'
           console.error('Error completing job card:', error);
           alert('Failed to complete job card');
         }
+        finally { setCompletingJobCard(false); }
       };
 
       const rejectJobCard = async () => {
@@ -2202,7 +2391,8 @@ const API_URL = window.location.hostname === 'localhost'
           alert('Please enter rejection reason');
           return;
         }
-        
+
+        setRejectingJobCard(true);
         try {
           const response = await fetch(`${API_URL}/job-cards/${currentJobCard.id}/reject`, {
             method: 'POST',
@@ -2212,7 +2402,7 @@ const API_URL = window.location.hostname === 'localhost'
             },
             body: JSON.stringify({ reason: rejectReason })
           });
-          
+
           const data = await response.json();
           if (data.error) {
             alert(data.error);
@@ -2225,6 +2415,7 @@ const API_URL = window.location.hostname === 'localhost'
           console.error('Error rejecting job card:', error);
           alert('Failed to reject job card');
         }
+        finally { setRejectingJobCard(false); }
       };
 
       const printJobCard = () => {
@@ -2407,56 +2598,58 @@ const API_URL = window.location.hostname === 'localhost'
             </div>
           </div>
 
-          {filteredJobCards.length === 0 ? (
-            <div className="text-center py-20 text-gray-500">
-              <div className="text-6xl mb-4">📋</div>
-              <h3 className="text-xl font-semibold mb-2">No job cards found</h3>
-              <p>Create your first job card to get started</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredJobCards.map(job => (
-                <div
-                  key={job.id}
-                  className={`bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition border-l-4 ${
-                    job.status === 'open' ? 'border-green-500' :
-                    job.status === 'closed' ? 'border-gray-500' : 'border-red-500'
-                  }`}
-                  onClick={() => viewJobCard(job.id)}
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="text-lg font-bold text-blue-600">{job.job_number}</div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${
-                      job.status === 'open' ? 'bg-green-100 text-green-800' :
-                      job.status === 'closed' ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {job.status}
-                    </span>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <strong className="text-gray-600">Customer:</strong>
-                      <div>{job.customer_name}</div>
+          <SectionLoader loading={loadingJobCards} message="Loading job cards...">
+            {filteredJobCards.length === 0 ? (
+              <div className="text-center py-20 text-gray-500">
+                <div className="text-6xl mb-4">📋</div>
+                <h3 className="text-xl font-semibold mb-2">No job cards found</h3>
+                <p>Create your first job card to get started</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredJobCards.map(job => (
+                  <div
+                    key={job.id}
+                    className={`bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition border-l-4 ${
+                      job.status === 'open' ? 'border-green-500' :
+                      job.status === 'closed' ? 'border-gray-500' : 'border-red-500'
+                    }`}
+                    onClick={() => viewJobCard(job.id)}
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="text-lg font-bold text-blue-600">{job.job_number}</div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${
+                        job.status === 'open' ? 'bg-green-100 text-green-800' :
+                        job.status === 'closed' ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {job.status}
+                      </span>
                     </div>
-                    <div>
-                      <strong className="text-gray-600">Vehicle:</strong>
-                      <div>{job.vehicle_number}</div>
-                    </div>
-                    {job.assignee && (
+                    <div className="space-y-2 text-sm">
                       <div>
-                        <strong className="text-gray-600">Assignee:</strong>
-                        <div>{job.assignee}</div>
+                        <strong className="text-gray-600">Customer:</strong>
+                        <div>{job.customer_name}</div>
                       </div>
-                    )}
-                    <div>
-                      <strong className="text-gray-600">Created:</strong>
-                      <div>{new Date(job.created_at).toLocaleDateString()}</div>
+                      <div>
+                        <strong className="text-gray-600">Vehicle:</strong>
+                        <div>{job.vehicle_number}</div>
+                      </div>
+                      {job.assignee && (
+                        <div>
+                          <strong className="text-gray-600">Assignee:</strong>
+                          <div>{job.assignee}</div>
+                        </div>
+                      )}
+                      <div>
+                        <strong className="text-gray-600">Created:</strong>
+                        <div>{new Date(job.created_at).toLocaleDateString()}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </SectionLoader>
 
           {/* Create Job Card Modal */}
           {showCreateModal && (
@@ -2571,15 +2764,17 @@ const API_URL = window.location.hostname === 'localhost'
                   </div>
 
                   <div className="flex gap-4 mt-6">
-                    <button
+                    <ButtonLoader
+                      loading={creatingJobCard}
                       onClick={createJobCard}
                       className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
                     >
                       Create Job Card
-                    </button>
+                    </ButtonLoader>
                     <button
                       onClick={closeCreateModal}
                       className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                      disabled={creatingJobCard}
                     >
                       Cancel
                     </button>
@@ -2791,15 +2986,17 @@ const API_URL = window.location.hostname === 'localhost'
                   </div>
 
                   <div className="flex gap-4 mt-6">
-                    <button
+                    <ButtonLoader
+                      loading={addingStockItem}
                       onClick={addStockItem}
                       className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
                     >
                       Add Stock
-                    </button>
+                    </ButtonLoader>
                     <button
                       onClick={() => { setShowAddStockModal(false); resetStockForm(); }}
                       className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                      disabled={addingStockItem}
                     >
                       Cancel
                     </button>
@@ -2872,15 +3069,17 @@ const API_URL = window.location.hostname === 'localhost'
                   </div>
 
                   <div className="flex gap-4">
-                    <button
+                    <ButtonLoader
+                      loading={completingJobCard}
                       onClick={completeJobCard}
                       className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
                     >
                       Complete Job Card
-                    </button>
+                    </ButtonLoader>
                     <button
                       onClick={() => setShowBillingModal(false)}
                       className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                      disabled={completingJobCard}
                     >
                       Cancel
                     </button>
@@ -2913,15 +3112,17 @@ const API_URL = window.location.hostname === 'localhost'
                   </div>
 
                   <div className="flex gap-4 mt-6">
-                    <button
+                    <ButtonLoader
+                      loading={rejectingJobCard}
                       onClick={rejectJobCard}
                       className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold"
                     >
                       Reject Job Card
-                    </button>
+                    </ButtonLoader>
                     <button
                       onClick={() => { setShowRejectModal(false); setRejectReason(''); }}
                       className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                      disabled={rejectingJobCard}
                     >
                       Cancel
                     </button>

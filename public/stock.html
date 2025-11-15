@@ -43,6 +43,46 @@
       return res.json();
     }
 
+    function Spinner({ size = 'md' }) {
+      const sizeClasses = { sm: 'w-4 h-4', md: 'w-8 h-8', lg: 'w-12 h-12' };
+      return (
+        <div className={`${sizeClasses[size]} border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin`}></div>
+      );
+    }
+
+    function LoadingOverlay({ message = 'Loading...' }) {
+      return (
+        <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-10 rounded-lg">
+          <div className="text-center">
+            <Spinner size="lg" />
+            <p className="mt-4 text-gray-600 font-medium">{message}</p>
+          </div>
+        </div>
+      );
+    }
+
+    function ButtonLoader({ loading, children, ...props }) {
+      return (
+        <button {...props} disabled={loading || props.disabled} className={`${props.className} ${loading ? 'opacity-75 cursor-not-allowed' : ''}`}>
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Spinner size="sm" />
+              <span>Processing...</span>
+            </span>
+          ) : children}
+        </button>
+      );
+    }
+
+    function SectionLoader({ loading, children, message = 'Loading...' }) {
+      return (
+        <div className="relative min-h-[200px]">
+          {loading && <LoadingOverlay message={message} />}
+          {children}
+        </div>
+      );
+    }
+
     function Login() {
       const [form, setForm] = useState({ username: 'admin', password: 'admin123' });
       const { login } = React.useContext(AuthContext);
@@ -113,29 +153,41 @@
         notes: ''
       });
 
+      const [loadingProducts, setLoadingProducts] = useState(false);
+      const [loadingTransactions, setLoadingTransactions] = useState(false);
+      const [submittingProduct, setSubmittingProduct] = useState(false);
+      const [submittingPurchase, setSubmittingPurchase] = useState(false);
+      const [submittingAdjustment, setSubmittingAdjustment] = useState(false);
+      const [loadingDetails, setLoadingDetails] = useState(false);
+
       useEffect(() => { loadProducts(); }, []);
 
       const loadProducts = async () => {
+        setLoadingProducts(true);
         try {
           const data = await apiCall('/products');
           setProducts(data);
           const racks = [...new Set(data.map(p => p.rack_id).filter(r => r))].sort();
           setAllRacks(racks);
         } catch (err) { console.error(err); }
+        finally { setLoadingProducts(false); }
       };
 
       const loadTransactions = async (productId) => {
+        setLoadingTransactions(true);
         try {
           const data = await apiCall(`/inventory-transactions/product/${productId}`);
           setTransactions(data);
         } catch (err) { console.error(err); }
+        finally { setLoadingTransactions(false); }
       };
 
       const handleAddProduct = async (e) => {
         e.preventDefault();
         if (!productForm.name.trim()) { alert('Product name is required'); return; }
         if (!productForm.sell_price || parseFloat(productForm.sell_price) <= 0) { alert('Valid sell price is required'); return; }
-        
+
+        setSubmittingProduct(true);
         try {
           await apiCall('/products', {
             method: 'POST',
@@ -151,13 +203,15 @@
           setProductForm({ name: '', sell_price: '', vendor: '', rack_id: '', additional_info: '' });
           loadProducts();
         } catch (err) { alert(err.message); }
+        finally { setSubmittingProduct(false); }
       };
 
       const handleAddPurchase = async (e) => {
         e.preventDefault();
         if (!purchaseForm.quantity || parseInt(purchaseForm.quantity) <= 0) { alert('Valid quantity is required'); return; }
         if (!purchaseForm.unit_cost || parseFloat(purchaseForm.unit_cost) <= 0) { alert('Valid unit cost is required'); return; }
-        
+
+        setSubmittingPurchase(true);
         try {
           await apiCall('/inventory-transactions', {
             method: 'POST',
@@ -176,12 +230,14 @@
           loadTransactions(selectedProduct.id);
           loadProducts();
         } catch (err) { alert(err.message); }
+        finally { setSubmittingPurchase(false); }
       };
 
       const handleAdjustment = async (e) => {
         e.preventDefault();
         if (!adjustmentForm.quantity || parseInt(adjustmentForm.quantity) <= 0) { alert('Valid quantity is required'); return; }
-        
+
+        setSubmittingAdjustment(true);
         try {
           await apiCall('/inventory-transactions', {
             method: 'POST',
@@ -197,11 +253,17 @@
           loadTransactions(selectedProduct.id);
           loadProducts();
         } catch (err) { alert(err.message); }
+        finally { setSubmittingAdjustment(false); }
       };
 
       const openProductDetails = async (product) => {
-        setSelectedProduct(product);
-        await loadTransactions(product.id);
+        setLoadingDetails(true);
+        try {
+          setSelectedProduct(product);
+          await loadTransactions(product.id);
+        } finally {
+          setLoadingDetails(false);
+        }
       };
 
       const filteredProducts = products.filter(p => {
@@ -229,7 +291,8 @@
               </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 py-6">
+            <main className="max-w-7xl mx-auto px-4 py-6 relative">
+              {loadingDetails && <LoadingOverlay message="Loading product details..." />}
               {/* Product Summary Card */}
               <div className="bg-white rounded-lg shadow p-6 mb-6">
                 <div className="flex justify-between items-start mb-4">
@@ -279,57 +342,59 @@
               </div>
 
               {/* Transactions History */}
-              <div className="bg-white rounded-lg shadow">
-                <div className="p-6 border-b">
-                  <h2 className="text-xl font-bold">Transaction History</h2>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {transactions.length === 0 ? (
+              <SectionLoader loading={loadingTransactions} message="Loading transactions...">
+                <div className="bg-white rounded-lg shadow">
+                  <div className="p-6 border-b">
+                    <h2 className="text-xl font-bold">Transaction History</h2>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
                         <tr>
-                          <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
-                            No transactions yet. Add your first purchase!
-                          </td>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Cost</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
                         </tr>
-                      ) : (
-                        transactions.map(t => (
-                          <tr key={t.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 text-sm">{new Date(t.transaction_date).toLocaleString()}</td>
-                            <td className="px-6 py-4">
-                              <span className={`px-2 py-1 text-xs rounded ${
-                                t.transaction_type === 'PURCHASE' ? 'bg-green-100 text-green-800' :
-                                t.transaction_type === 'SALE' ? 'bg-blue-100 text-blue-800' :
-                                'bg-orange-100 text-orange-800'
-                              }`}>
-                                {t.transaction_type}
-                              </span>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {transactions.length === 0 ? (
+                          <tr>
+                            <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
+                              No transactions yet. Add your first purchase!
                             </td>
-                            <td className="px-6 py-4 text-sm font-medium">{t.quantity}</td>
-                            <td className="px-6 py-4 text-sm">{t.unit_cost ? `₹${t.unit_cost}` : '-'}</td>
-                            <td className="px-6 py-4 text-sm font-medium">{t.unit_cost ? `₹${(t.quantity * t.unit_cost).toFixed(2)}` : '-'}</td>
-                            <td className="px-6 py-4 text-sm">{t.vendor || '-'}</td>
-                            <td className="px-6 py-4 text-sm">{t.reference_no || '-'}</td>
-                            <td className="px-6 py-4 text-sm text-gray-600">{t.notes || '-'}</td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ) : (
+                          transactions.map(t => (
+                            <tr key={t.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 text-sm">{new Date(t.transaction_date).toLocaleString()}</td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-1 text-xs rounded ${
+                                  t.transaction_type === 'PURCHASE' ? 'bg-green-100 text-green-800' :
+                                  t.transaction_type === 'SALE' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-orange-100 text-orange-800'
+                                }`}>
+                                  {t.transaction_type}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-sm font-medium">{t.quantity}</td>
+                              <td className="px-6 py-4 text-sm">{t.unit_cost ? `₹${t.unit_cost}` : '-'}</td>
+                              <td className="px-6 py-4 text-sm font-medium">{t.unit_cost ? `₹${(t.quantity * t.unit_cost).toFixed(2)}` : '-'}</td>
+                              <td className="px-6 py-4 text-sm">{t.vendor || '-'}</td>
+                              <td className="px-6 py-4 text-sm">{t.reference_no || '-'}</td>
+                              <td className="px-6 py-4 text-sm text-gray-600">{t.notes || '-'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              </SectionLoader>
             </main>
 
             {/* Add Purchase Modal */}
@@ -368,8 +433,8 @@
                       )}
                     </div>
                     <div className="flex gap-3 mt-6">
-                      <button type="button" onClick={() => setShowAddPurchase(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                      <button type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Add Purchase</button>
+                      <button type="button" onClick={() => setShowAddPurchase(false)} disabled={submittingPurchase} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50 disabled:opacity-50">Cancel</button>
+                      <ButtonLoader loading={submittingPurchase} type="submit" className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Add Purchase</ButtonLoader>
                     </div>
                   </form>
                 </div>
@@ -414,8 +479,8 @@
                       </div>
                     </div>
                     <div className="flex gap-3 mt-6">
-                      <button type="button" onClick={() => setShowAdjustment(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                      <button type="submit" className="flex-1 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">Adjust Stock</button>
+                      <button type="button" onClick={() => setShowAdjustment(false)} disabled={submittingAdjustment} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50 disabled:opacity-50">Cancel</button>
+                      <ButtonLoader loading={submittingAdjustment} type="submit" className="flex-1 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700">Adjust Stock</ButtonLoader>
                     </div>
                   </form>
                 </div>
@@ -460,57 +525,59 @@
               <button onClick={() => setShowAddProduct(true)} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">+ Add Product</button>
             </div>
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sell Price (₹)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Cost (₹)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {filteredProducts.length === 0 ? (
+            <SectionLoader loading={loadingProducts} message="Loading products...">
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                        {products.length === 0 ? (
-                          <div>
-                            <p className="text-lg font-medium mb-2">No products yet</p>
-                            <p className="text-sm">Click "Add Product" to get started</p>
-                          </div>
-                        ) : (
-                          <div>No products match your search</div>
-                        )}
-                      </td>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sell Price (₹)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Cost (₹)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rack</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
-                  ) : (
-                    filteredProducts.map(p => (
-                      <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openProductDetails(p)}>
-                        <td className="px-6 py-4 font-medium text-blue-600">{p.name}</td>
-                        <td className="px-6 py-4">
-                          <span className={`font-bold ${p.quantity === 0 ? 'text-red-600' : p.quantity < 10 ? 'text-orange-600' : 'text-green-600'}`}>
-                            {p.quantity}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">₹{p.sell_price}</td>
-                        <td className="px-6 py-4">₹{p.purchase_price.toFixed(2)}</td>
-                        <td className="px-6 py-4 text-gray-600">{p.vendor || '-'}</td>
-                        <td className="px-6 py-4 text-gray-600">{p.rack_id || '-'}</td>
-                        <td className="px-6 py-4">
-                          <button onClick={(e) => { e.stopPropagation(); openProductDetails(p); }} className="text-blue-600 hover:text-blue-800">
-                            View Details →
-                          </button>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                          {products.length === 0 ? (
+                            <div>
+                              <p className="text-lg font-medium mb-2">No products yet</p>
+                              <p className="text-sm">Click "Add Product" to get started</p>
+                            </div>
+                          ) : (
+                            <div>No products match your search</div>
+                          )}
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : (
+                      filteredProducts.map(p => (
+                        <tr key={p.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openProductDetails(p)}>
+                          <td className="px-6 py-4 font-medium text-blue-600">{p.name}</td>
+                          <td className="px-6 py-4">
+                            <span className={`font-bold ${p.quantity === 0 ? 'text-red-600' : p.quantity < 10 ? 'text-orange-600' : 'text-green-600'}`}>
+                              {p.quantity}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">₹{p.sell_price}</td>
+                          <td className="px-6 py-4">₹{p.purchase_price.toFixed(2)}</td>
+                          <td className="px-6 py-4 text-gray-600">{p.vendor || '-'}</td>
+                          <td className="px-6 py-4 text-gray-600">{p.rack_id || '-'}</td>
+                          <td className="px-6 py-4">
+                            <button onClick={(e) => { e.stopPropagation(); openProductDetails(p); }} className="text-blue-600 hover:text-blue-800">
+                              View Details →
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </SectionLoader>
 
             <div className="mt-4 text-sm text-gray-600">
               Showing {filteredProducts.length} of {products.length} products
@@ -549,8 +616,8 @@
                     </div>
                   </div>
                   <div className="flex gap-3 mt-6">
-                    <button type="button" onClick={() => setShowAddProduct(false)} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50">Cancel</button>
-                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Product</button>
+                    <button type="button" onClick={() => setShowAddProduct(false)} disabled={submittingProduct} className="flex-1 px-4 py-2 border rounded hover:bg-gray-50 disabled:opacity-50">Cancel</button>
+                    <ButtonLoader loading={submittingProduct} type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add Product</ButtonLoader>
                   </div>
                 </form>
               </div>
