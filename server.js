@@ -2023,7 +2023,9 @@ app.post('/api/bills/:id/cancel', authenticateToken, (req, res) => {
 
 // Helper function to generate bill HTML
 function generateBillHTML(bill, customer, items) {
-  const serviceItems = items.filter(item => item.type === 'service');
+  // Only show services that have actual pricing (amount > 0)
+  // Services with ₹0.00 are not displayed since labour charge is shown separately
+  const serviceItems = items.filter(item => item.type === 'service' && item.amount > 0);
   const partItems = items.filter(item => item.type === 'part');
 
   return `

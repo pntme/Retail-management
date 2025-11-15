@@ -1669,10 +1669,18 @@ const API_URL = window.location.hostname === 'localhost'
               : item
           ));
         } else {
+          // Ensure unit_price is a valid number, default to 0 if not
+          const unitPrice = parseFloat(product.sell_price) || 0;
+
+          // Warn if product has no price set
+          if (unitPrice === 0) {
+            alert(`Warning: "${product.name}" has no selling price set (₹0.00). You can edit the price in the cart.`);
+          }
+
           setSelectedItems([...selectedItems, {
             product_id: product.id,
             product_name: product.name,
-            unit_price: product.sell_price,
+            unit_price: unitPrice,
             quantity: 1
           }]);
         }
@@ -1700,9 +1708,11 @@ const API_URL = window.location.hostname === 'localhost'
 
       // Update item price
       const updatePrice = (productId, price) => {
+        // Ensure price is a valid number
+        const validPrice = parseFloat(price) || 0;
         setSelectedItems(selectedItems.map(item =>
           item.product_id === productId
-            ? { ...item, unit_price: parseFloat(price) }
+            ? { ...item, unit_price: validPrice }
             : item
         ));
       };
