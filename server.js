@@ -2223,6 +2223,145 @@ function generateBillHTML(bill, customer, items) {
   `;
 }
 
+// ==================== PROFIT & LOSS ROUTES ====================
+
+// Get profit and loss report with date filtering
+app.get('/api/reports/profit-loss', authenticateToken, (req, res) => {
+  const { from, to } = req.query;
+  const fromDate = from || '1900-01-01';
+  const toDate = to || '2099-12-31';
+
+  // Get total revenue from bills
+  db.get(
+    `SELECT
+      COALESCE(SUM(total), 0) as total_revenue,
+      COUNT(*) as bill_count
+     FROM bills
+     WHERE bill_date >= ? AND bill_date <= ? AND status = 'finalized'`,
+    [fromDate, toDate],
+    (err, revenueData) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+
+      // Get total costs from inventory purchases
+      db.get(
+        `SELECT
+          COALESCE(SUM(total_amount), 0) as total_costs
+         FROM inventory_transactions
+         WHERE transaction_type = 'PURCHASE'
+         AND DATE(transaction_date) >= ? AND DATE(transaction_date) <= ?`,
+        [fromDate, toDate],
+        (err, costData) => {
+          if (err) {
+            return res.status(500).json({ error: err.message });
+          }
+
+          // Get daily breakdown for charts
+          db.all(
+            `SELECT
+              bill_date as date,
+              COALESCE(SUM(total), 0) as revenue,
+              COUNT(*) as transactions
+             FROM bills
+             WHERE bill_date >= ? AND bill_date <= ? AND status = 'finalized'
+             GROUP BY bill_date
+             ORDER BY bill_date`,
+            [fromDate, toDate],
+            (err, dailyRevenue) => {
+              if (err) {
+                return res.status(500).json({ error: err.message });
+              }
+
+              // Get daily costs
+              db.all(
+                `SELECT
+                  DATE(transaction_date) as date,
+                  COALESCE(SUM(total_amount), 0) as costs
+                 FROM inventory_transactions
+                 WHERE transaction_type = 'PURCHASE'
+                 AND DATE(transaction_date) >= ? AND DATE(transaction_date) <= ?
+                 GROUP BY DATE(transaction_date)
+                 ORDER BY DATE(transaction_date)`,
+                [fromDate, toDate],
+                (err, dailyCosts) => {
+                  if (err) {
+                    return res.status(500).json({ error: err.message });
+                  }
+
+                  // Get payment status breakdown
+                  db.all(
+                    `SELECT
+                      payment_status,
+                      COALESCE(SUM(total), 0) as amount,
+                      COUNT(*) as count
+                     FROM bills
+                     WHERE bill_date >= ? AND bill_date <= ?
+                     GROUP BY payment_status`,
+                    [fromDate, toDate],
+                    (err, paymentBreakdown) => {
+                      if (err) {
+                        return res.status(500).json({ error: err.message });
+                      }
+
+                      // Calculate profit/loss
+                      const totalRevenue = revenueData.total_revenue || 0;
+                      const totalCosts = costData.total_costs || 0;
+                      const profitLoss = totalRevenue - totalCosts;
+
+                      // Combine daily data
+                      const dailyData = {};
+
+                      dailyRevenue.forEach(day => {
+                        if (!dailyData[day.date]) {
+                          dailyData[day.date] = { date: day.date, revenue: 0, costs: 0, profit: 0 };
+                        }
+                        dailyData[day.date].revenue = day.revenue;
+                      });
+
+                      dailyCosts.forEach(day => {
+                        if (!dailyData[day.date]) {
+                          dailyData[day.date] = { date: day.date, revenue: 0, costs: 0, profit: 0 };
+                        }
+                        dailyData[day.date].costs = day.costs;
+                      });
+
+                      // Calculate profit for each day
+                      Object.keys(dailyData).forEach(date => {
+                        dailyData[date].profit = dailyData[date].revenue - dailyData[date].costs;
+                      });
+
+                      const dailyChart = Object.values(dailyData).sort((a, b) =>
+                        new Date(a.date) - new Date(b.date)
+                      );
+
+                      res.json({
+                        summary: {
+                          total_revenue: totalRevenue,
+                          total_costs: totalCosts,
+                          profit_loss: profitLoss,
+                          bill_count: revenueData.bill_count,
+                          profit_margin: totalRevenue > 0 ? ((profitLoss / totalRevenue) * 100).toFixed(2) : 0
+                        },
+                        payment_breakdown: paymentBreakdown,
+                        daily_chart: dailyChart,
+                        date_range: {
+                          from: fromDate,
+                          to: toDate
+                        }
+                      });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
 // ==================== START SERVER ====================
 
 app.listen(PORT, () => {
