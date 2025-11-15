@@ -3948,7 +3948,7 @@ const API_URL = window.location.hostname === 'localhost'
 
       const handleViewBill = (billId) => {
         const token = localStorage.getItem('token');
-        const url = `${API_URL}/bills/${billId}/view`;
+        const url = `${API_URL}/bills/${billId}/view?token=${encodeURIComponent(token)}`;
         window.open(url, '_blank');
       };
 

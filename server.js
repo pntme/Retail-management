@@ -329,6 +329,27 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// Authentication middleware that also accepts token via query parameter (for viewing bills in browser)
+function authenticateTokenFlexible(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const headerToken = authHeader && authHeader.split(' ')[1];
+  const queryToken = req.query.token;
+
+  const token = headerToken || queryToken;
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access denied' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid token' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
 // ==================== BILL HELPER FUNCTIONS ====================
 
 // Generate next bill number (Format: BIL-YYYY-NNNN)
@@ -1821,7 +1842,7 @@ app.get('/api/bills', authenticateToken, (req, res) => {
 });
 
 // View bill as HTML (for browser display)
-app.get('/api/bills/:id/view', authenticateToken, (req, res) => {
+app.get('/api/bills/:id/view', authenticateTokenFlexible, (req, res) => {
   const billId = req.params.id;
 
   db.get('SELECT * FROM bills WHERE id = ?', [billId], (err, bill) => {
