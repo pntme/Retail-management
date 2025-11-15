@@ -1353,7 +1353,7 @@ const API_URL = window.location.hostname === 'localhost'
       const showMessage = (message, type = 'info', action = null) => {
         setModalMessage(message);
         setModalType(type);
-        setModalAction(action);
+        setModalAction(() => action);
         setShowModal(true);
       };
 
