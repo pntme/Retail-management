@@ -122,6 +122,34 @@ docker-compose up -d
 
 ## 2. Cloud Deployment
 
+### Railway Deployment (Recommended - With Data Persistence)
+
+**⚠️ IMPORTANT: Railway uses ephemeral storage. You MUST use volumes to prevent data loss!**
+
+See **[RAILWAY-DEPLOYMENT.md](./RAILWAY-DEPLOYMENT.md)** for detailed instructions.
+
+**Quick Start:**
+
+1. Push code to GitHub
+2. Go to [railway.app](https://railway.app)
+3. Create new project from your GitHub repo
+4. **Add a Volume**:
+   - Go to service → Volumes → New Volume
+   - Mount path: `/data`
+   - Size: 1GB (to start)
+5. **Set environment variable**:
+   ```
+   RAILWAY_VOLUME_MOUNT_PATH=/data
+   ```
+6. Deploy!
+
+**Why Railway?**
+- ✅ Easy deployment from GitHub
+- ✅ Automatic HTTPS
+- ✅ Built-in monitoring
+- ✅ Free tier available
+- ✅ Persistent storage with volumes
+
 ### Heroku Deployment
 
 ```bash

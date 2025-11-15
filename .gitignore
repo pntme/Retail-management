@@ -10,6 +10,10 @@ yarn.lock
 *.sqlite
 *.sqlite3
 
+# Data directory (contains database and uploads)
+data/
+uploads/
+
 # Environment variables
 .env
 
