@@ -1413,20 +1413,804 @@ const API_URL = window.location.hostname === 'localhost'
       );
     }
 
-    function Services() {
-      return (
-        <div>
-          <h1 className="text-3xl font-bold mb-6">Recurring Services</h1>
-          <div className="bg-white rounded-lg p-6 shadow">Services list placeholder</div>
-        </div>
-      );
-    }
 
     function Sales() {
+      const [mode, setMode] = useState(''); // 'jobcard' or 'direct'
+      const [loading, setLoading] = useState(false);
+
+      // Job Card mode states
+      const [jobCards, setJobCards] = useState([]);
+      const [searchTerm, setSearchTerm] = useState('');
+      const [selectedJobCard, setSelectedJobCard] = useState(null);
+      const [jobCardDetails, setJobCardDetails] = useState(null);
+
+      // Direct Sell mode states
+      const [customers, setCustomers] = useState([]);
+      const [customerSearch, setCustomerSearch] = useState('');
+      const [selectedCustomer, setSelectedCustomer] = useState(null);
+      const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
+      const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', address: '' });
+
+      // Common states for both modes
+      const [products, setProducts] = useState([]);
+      const [productSearch, setProductSearch] = useState('');
+      const [selectedItems, setSelectedItems] = useState([]);
+      const [showProductSearch, setShowProductSearch] = useState(false);
+      const [discount, setDiscount] = useState(0);
+      const [paymentMethod, setPaymentMethod] = useState('cash');
+      const [showBillModal, setShowBillModal] = useState(false);
+      const [billGenerated, setBillGenerated] = useState(false);
+
+      // Fetch open job cards for Job Card mode
+      const fetchJobCards = async () => {
+        setLoading(true);
+        try {
+          const data = await apiCall('/api/job-cards?status=open');
+          setJobCards(data);
+        } catch (error) {
+          console.error('Error fetching job cards:', error);
+        }
+        setLoading(false);
+      };
+
+      // Fetch customers for Direct Sell mode
+      const fetchCustomers = async () => {
+        setLoading(true);
+        try {
+          const data = await apiCall('/api/customers');
+          setCustomers(data);
+        } catch (error) {
+          console.error('Error fetching customers:', error);
+        }
+        setLoading(false);
+      };
+
+      // Fetch products for stock selection
+      const fetchProducts = async () => {
+        try {
+          const data = await apiCall('/api/products');
+          setProducts(data);
+        } catch (error) {
+          console.error('Error fetching products:', error);
+        }
+      };
+
+      // Load job card details when selected
+      const loadJobCardDetails = async (jobCardId) => {
+        setLoading(true);
+        try {
+          const data = await apiCall(`/api/job-cards/${jobCardId}`);
+          setJobCardDetails(data);
+          setSelectedJobCard(data);
+        } catch (error) {
+          console.error('Error fetching job card details:', error);
+        }
+        setLoading(false);
+      };
+
+      // Filter job cards by search term
+      const filteredJobCards = jobCards.filter(jc =>
+        jc.vehicle_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        jc.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        jc.customer_phone?.includes(searchTerm) ||
+        jc.customer_email?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      // Filter customers by search term
+      const filteredCustomers = customers.filter(c =>
+        c.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        c.phone?.includes(customerSearch) ||
+        c.email?.toLowerCase().includes(customerSearch.toLowerCase())
+      );
+
+      // Filter products by search term
+      const filteredProducts = products.filter(p =>
+        p.name?.toLowerCase().includes(productSearch.toLowerCase())
+      );
+
+      // Calculate available quantity for a product
+      const getAvailableQuantity = (productId) => {
+        const product = products.find(p => p.id === productId);
+        return product?.quantity || 0;
+      };
+
+      // Add item to cart
+      const addItem = (product) => {
+        const existing = selectedItems.find(item => item.product_id === product.id);
+        if (existing) {
+          setSelectedItems(selectedItems.map(item =>
+            item.product_id === product.id
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          ));
+        } else {
+          setSelectedItems([...selectedItems, {
+            product_id: product.id,
+            product_name: product.name,
+            unit_price: product.sell_price,
+            quantity: 1
+          }]);
+        }
+        setShowProductSearch(false);
+        setProductSearch('');
+      };
+
+      // Update item quantity
+      const updateQuantity = (productId, quantity) => {
+        if (quantity <= 0) {
+          setSelectedItems(selectedItems.filter(item => item.product_id !== productId));
+        } else {
+          const available = getAvailableQuantity(productId);
+          if (quantity > available) {
+            alert(`Only ${available} units available in stock`);
+            return;
+          }
+          setSelectedItems(selectedItems.map(item =>
+            item.product_id === productId
+              ? { ...item, quantity: parseInt(quantity) }
+              : item
+          ));
+        }
+      };
+
+      // Update item price
+      const updatePrice = (productId, price) => {
+        setSelectedItems(selectedItems.map(item =>
+          item.product_id === productId
+            ? { ...item, unit_price: parseFloat(price) }
+            : item
+        ));
+      };
+
+      // Remove item from cart
+      const removeItem = (productId) => {
+        setSelectedItems(selectedItems.filter(item => item.product_id !== productId));
+      };
+
+      // Calculate totals
+      const calculateTotals = () => {
+        const subtotal = selectedItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+        const discountAmount = discount || 0;
+        const total = subtotal - discountAmount;
+        return { subtotal, discountAmount, total };
+      };
+
+      // Create new customer for Direct Sell
+      const createNewCustomer = async () => {
+        if (!newCustomer.name || !newCustomer.phone) {
+          alert('Name and phone are required');
+          return;
+        }
+        setLoading(true);
+        try {
+          const created = await apiCall('/api/customers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newCustomer)
+          });
+          setSelectedCustomer(created);
+          setShowNewCustomerForm(false);
+          setNewCustomer({ name: '', email: '', phone: '', address: '' });
+        } catch (error) {
+          console.error('Error creating customer:', error);
+          alert('Failed to create customer');
+        }
+        setLoading(false);
+      };
+
+      // Generate bill and complete sale
+      const generateBill = async () => {
+        if (selectedItems.length === 0) {
+          alert('Please add at least one item');
+          return;
+        }
+
+        const customerId = mode === 'jobcard' ? selectedJobCard?.customer_id : selectedCustomer?.id;
+        if (!customerId) {
+          alert('Please select a customer');
+          return;
+        }
+
+        const { total } = calculateTotals();
+
+        setLoading(true);
+        try {
+          const saleData = {
+            customer_id: customerId,
+            items: selectedItems,
+            discount: discount || 0,
+            tax: 0,
+            payment_method: paymentMethod
+          };
+
+          await apiCall('/api/sales', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(saleData)
+          });
+
+          // If job card mode, mark job card as completed
+          if (mode === 'jobcard' && selectedJobCard) {
+            await apiCall(`/api/job-cards/${selectedJobCard.id}/complete`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                labour_charge: 0,
+                discount: discount || 0
+              })
+            });
+          }
+
+          setBillGenerated(true);
+          setShowBillModal(true);
+        } catch (error) {
+          console.error('Error generating bill:', error);
+          alert('Failed to generate bill');
+        }
+        setLoading(false);
+      };
+
+      // Reset form
+      const resetForm = () => {
+        setMode('');
+        setSelectedJobCard(null);
+        setJobCardDetails(null);
+        setSelectedCustomer(null);
+        setSelectedItems([]);
+        setDiscount(0);
+        setPaymentMethod('cash');
+        setBillGenerated(false);
+        setShowBillModal(false);
+        setSearchTerm('');
+        setCustomerSearch('');
+      };
+
+      React.useEffect(() => {
+        if (mode === 'jobcard') {
+          fetchJobCards();
+        } else if (mode === 'direct') {
+          fetchCustomers();
+        }
+        fetchProducts();
+      }, [mode]);
+
+      // Mode Selection Screen
+      if (!mode) {
+        return (
+          <div>
+            <h1 className="text-3xl font-bold mb-6">Sales & Billing</h1>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <button
+                onClick={() => setMode('jobcard')}
+                className="bg-white rounded-lg p-8 shadow hover:shadow-lg transition-shadow border-2 border-transparent hover:border-blue-500"
+              >
+                <div className="text-6xl mb-4">🔧</div>
+                <h2 className="text-2xl font-bold mb-2">Sell by Job Card</h2>
+                <p className="text-gray-600">
+                  Select from open job cards and complete the sale with stock items
+                </p>
+              </button>
+              <button
+                onClick={() => setMode('direct')}
+                className="bg-white rounded-lg p-8 shadow hover:shadow-lg transition-shadow border-2 border-transparent hover:border-green-500"
+              >
+                <div className="text-6xl mb-4">💰</div>
+                <h2 className="text-2xl font-bold mb-2">Direct Sell</h2>
+                <p className="text-gray-600">
+                  Sell directly to any customer (registered or walk-in)
+                </p>
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // Common Bill Modal
+      const BillModal = () => {
+        const { subtotal, discountAmount, total } = calculateTotals();
+        const customer = mode === 'jobcard' ? selectedJobCard : selectedCustomer;
+
+        return (
+          <Modal onClose={() => { setShowBillModal(false); if (billGenerated) resetForm(); }}>
+            <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
+              <h2 className="text-2xl font-bold mb-4 text-center">
+                {billGenerated ? 'Bill Generated Successfully' : 'Bill Preview'}
+              </h2>
+
+              <div className="border-b pb-4 mb-4">
+                <h3 className="font-bold text-lg mb-2">Customer Details</h3>
+                <p><strong>Name:</strong> {customer?.name || customer?.customer_name}</p>
+                <p><strong>Phone:</strong> {customer?.phone || customer?.customer_phone}</p>
+                {mode === 'jobcard' && (
+                  <p><strong>Vehicle:</strong> {customer?.vehicle_number}</p>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <h3 className="font-bold text-lg mb-2">Items</h3>
+                <table className="w-full">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2 text-left">Product</th>
+                      <th className="p-2 text-right">Qty</th>
+                      <th className="p-2 text-right">Price</th>
+                      <th className="p-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedItems.map(item => (
+                      <tr key={item.product_id} className="border-b">
+                        <td className="p-2">{item.product_name}</td>
+                        <td className="p-2 text-right">{item.quantity}</td>
+                        <td className="p-2 text-right">₹{item.unit_price.toFixed(2)}</td>
+                        <td className="p-2 text-right">₹{(item.quantity * item.unit_price).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="flex justify-between mb-2">
+                  <span>Subtotal:</span>
+                  <span>₹{subtotal.toFixed(2)}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between mb-2 text-green-600">
+                    <span>Discount:</span>
+                    <span>- ₹{discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-xl border-t pt-2">
+                  <span>Total:</span>
+                  <span>₹{total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mt-2">
+                  <span>Payment Method:</span>
+                  <span className="capitalize">{paymentMethod}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                {!billGenerated ? (
+                  <>
+                    <button
+                      onClick={() => setShowBillModal(false)}
+                      className="flex-1 px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={generateBill}
+                      disabled={loading}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
+                    >
+                      {loading ? 'Processing...' : 'Confirm & Generate Bill'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => { setShowBillModal(false); resetForm(); }}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Done
+                  </button>
+                )}
+              </div>
+            </div>
+          </Modal>
+        );
+      };
+
+      // Job Card Selection Screen
+      if (mode === 'jobcard' && !selectedJobCard) {
+        return (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-3xl font-bold">Sell by Job Card</h1>
+              <button
+                onClick={resetForm}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              >
+                Back
+              </button>
+            </div>
+
+            <div className="bg-white rounded-lg p-6 shadow mb-6">
+              <input
+                type="text"
+                placeholder="Search by vehicle number, customer name, phone, or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full p-3 border rounded"
+              />
+            </div>
+
+            {loading ? (
+              <div className="text-center py-8"><Spinner /></div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {filteredJobCards.length === 0 ? (
+                  <div className="bg-white rounded-lg p-6 shadow text-center text-gray-500">
+                    No open job cards found
+                  </div>
+                ) : (
+                  filteredJobCards.map(jc => (
+                    <div
+                      key={jc.id}
+                      className="bg-white rounded-lg p-6 shadow hover:shadow-lg transition-shadow cursor-pointer"
+                      onClick={() => loadJobCardDetails(jc.id)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-bold text-lg">{jc.job_number}</h3>
+                          <p className="text-gray-600">Customer: {jc.customer_name}</p>
+                          <p className="text-gray-600">Vehicle: {jc.vehicle_number}</p>
+                          <p className="text-gray-600">Phone: {jc.customer_phone}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                            {jc.status}
+                          </span>
+                          <p className="text-sm text-gray-500 mt-2">
+                            {new Date(jc.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Direct Sell - Customer Selection Screen
+      if (mode === 'direct' && !selectedCustomer) {
+        return (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-3xl font-bold">Direct Sell - Select Customer</h1>
+              <button
+                onClick={resetForm}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              >
+                Back
+              </button>
+            </div>
+
+            {!showNewCustomerForm ? (
+              <>
+                <div className="bg-white rounded-lg p-6 shadow mb-6">
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      placeholder="Search by customer name, phone, or email..."
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      className="flex-1 p-3 border rounded"
+                    />
+                    <button
+                      onClick={() => setShowNewCustomerForm(true)}
+                      className="px-6 py-3 bg-green-600 text-white rounded hover:bg-green-700"
+                    >
+                      New Customer
+                    </button>
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className="text-center py-8"><Spinner /></div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4">
+                    {filteredCustomers.map(customer => (
+                      <div
+                        key={customer.id}
+                        className="bg-white rounded-lg p-6 shadow hover:shadow-lg transition-shadow cursor-pointer"
+                        onClick={() => setSelectedCustomer(customer)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-bold text-lg">{customer.name}</h3>
+                            <p className="text-gray-600">Phone: {customer.phone}</p>
+                            {customer.email && <p className="text-gray-600">Email: {customer.email}</p>}
+                            {customer.vehicle_number && (
+                              <p className="text-gray-600">Vehicle: {customer.vehicle_number}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="bg-white rounded-lg p-6 shadow">
+                <h2 className="text-xl font-bold mb-4">Create New Customer</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Name *</label>
+                    <input
+                      type="text"
+                      value={newCustomer.name}
+                      onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Phone *</label>
+                    <input
+                      type="tel"
+                      value={newCustomer.phone}
+                      onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={newCustomer.email}
+                      onChange={(e) => setNewCustomer({...newCustomer, email: e.target.value})}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Address</label>
+                    <textarea
+                      value={newCustomer.address}
+                      onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})}
+                      className="w-full p-2 border rounded"
+                      rows="3"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowNewCustomerForm(false)}
+                      className="flex-1 px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={createNewCustomer}
+                      disabled={loading}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+                    >
+                      {loading ? 'Creating...' : 'Create & Continue'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      // Main Sales Screen (both modes after selection)
+      const customer = mode === 'jobcard' ? selectedJobCard : selectedCustomer;
+      const { subtotal, discountAmount, total } = calculateTotals();
+
       return (
         <div>
-          <h1 className="text-3xl font-bold mb-6">Sales & Billing</h1>
-          <div className="bg-white rounded-lg p-6 shadow">Sales list placeholder</div>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-3xl font-bold">
+              {mode === 'jobcard' ? 'Job Card Sale' : 'Direct Sale'}
+            </h1>
+            <button
+              onClick={resetForm}
+              className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {/* Customer Info */}
+          <div className="bg-white rounded-lg p-6 shadow mb-6">
+            <h2 className="text-xl font-bold mb-3">Customer Information</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Name</p>
+                <p className="font-medium">{customer?.name || customer?.customer_name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Phone</p>
+                <p className="font-medium">{customer?.phone || customer?.customer_phone}</p>
+              </div>
+              {mode === 'jobcard' && (
+                <>
+                  <div>
+                    <p className="text-sm text-gray-600">Vehicle Number</p>
+                    <p className="font-medium">{customer?.vehicle_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Job Card Number</p>
+                    <p className="font-medium">{customer?.job_number}</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Stock Items */}
+          <div className="bg-white rounded-lg p-6 shadow mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Stock Items</h2>
+              <button
+                onClick={() => setShowProductSearch(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                + Add Item
+              </button>
+            </div>
+
+            {selectedItems.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No items added yet</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-3 text-left">Product</th>
+                      <th className="p-3 text-right">Quantity</th>
+                      <th className="p-3 text-right">Unit Price</th>
+                      <th className="p-3 text-right">Total</th>
+                      <th className="p-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedItems.map(item => (
+                      <tr key={item.product_id} className="border-b">
+                        <td className="p-3">{item.product_name}</td>
+                        <td className="p-3 text-right">
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => updateQuantity(item.product_id, e.target.value)}
+                            className="w-20 p-1 border rounded text-right"
+                            min="1"
+                          />
+                        </td>
+                        <td className="p-3 text-right">
+                          <input
+                            type="number"
+                            value={item.unit_price}
+                            onChange={(e) => updatePrice(item.product_id, e.target.value)}
+                            className="w-24 p-1 border rounded text-right"
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+                        <td className="p-3 text-right">
+                          ₹{(item.quantity * item.unit_price).toFixed(2)}
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => removeItem(item.product_id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Billing Summary */}
+          <div className="bg-white rounded-lg p-6 shadow mb-6">
+            <h2 className="text-xl font-bold mb-4">Billing Summary</h2>
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <span className="font-medium">₹{subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Discount:</span>
+                <input
+                  type="number"
+                  value={discount}
+                  onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                  className="w-32 p-2 border rounded text-right"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Payment Method:</span>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="p-2 border rounded"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="upi">UPI</option>
+                  <option value="cheque">Cheque</option>
+                </select>
+              </div>
+              <div className="flex justify-between text-xl font-bold border-t pt-3">
+                <span>Total:</span>
+                <span>₹{total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button
+              onClick={resetForm}
+              className="flex-1 px-6 py-3 bg-gray-300 rounded hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => setShowBillModal(true)}
+              disabled={selectedItems.length === 0}
+              className="flex-1 px-6 py-3 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
+            >
+              Generate Bill
+            </button>
+          </div>
+
+          {/* Product Search Modal */}
+          {showProductSearch && (
+            <Modal onClose={() => { setShowProductSearch(false); setProductSearch(''); }}>
+              <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
+                <h2 className="text-2xl font-bold mb-4">Add Product</h2>
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="w-full p-3 border rounded mb-4"
+                  autoFocus
+                />
+                <div className="space-y-2">
+                  {filteredProducts.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">No products found</p>
+                  ) : (
+                    filteredProducts.map(product => {
+                      const available = getAvailableQuantity(product.id);
+                      return (
+                        <div
+                          key={product.id}
+                          onClick={() => available > 0 && addItem(product)}
+                          className={`p-4 border rounded ${
+                            available > 0
+                              ? 'cursor-pointer hover:bg-gray-50'
+                              : 'opacity-50 cursor-not-allowed'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="font-medium">{product.name}</p>
+                              <p className="text-sm text-gray-600">
+                                Available: {available} units
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold">₹{product.sell_price}</p>
+                              {available <= 0 && (
+                                <span className="text-xs text-red-600">Out of stock</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </Modal>
+          )}
+
+          {/* Bill Modal */}
+          {showBillModal && <BillModal />}
         </div>
       );
     }
@@ -3147,7 +3931,6 @@ const API_URL = window.location.hostname === 'localhost'
         { id: 'customers', label: 'Customers', icon: '👥' },
         { id: 'stock', label: 'Stock Management', icon: '📦' },
         { id: 'jobcards', label: 'Job Cards', icon: '🔧' },
-        { id: 'services', label: 'Services', icon: '🔄' },
         { id: 'sales', label: 'Sales', icon: '💰' },
       ];
 
@@ -3192,7 +3975,6 @@ const API_URL = window.location.hostname === 'localhost'
               {current === 'customers' && <Customers />}
               {current === 'stock' && <StockManagement />}
               {current === 'jobcards' && <JobCards />}
-              {current === 'services' && <Services />}
               {current === 'sales' && <Sales />}
             </section>
 
