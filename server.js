@@ -1179,13 +1179,13 @@ app.post('/api/sales', authenticateToken, (req, res) => {
           address: customer.address || ''
         };
 
-        // Prepare bill items
+        // Prepare bill items in the same format as job card bills
         const billItems = items.map(item => ({
-          product_id: item.product_id,
-          product_name: item.product_name,
+          type: 'part',
+          description: item.product_name,
           quantity: item.quantity,
-          unit_price: item.unit_price,
-          subtotal: item.quantity * item.unit_price
+          rate: item.unit_price,
+          amount: item.quantity * item.unit_price
         }));
 
         db.run(
