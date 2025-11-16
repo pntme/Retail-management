@@ -1252,13 +1252,38 @@ app.get('/api/dashboard/stats', authenticateToken, (req, res) => {
       `, [], (err, result) => {
         stats.low_stock_items = result.count;
 
-        db.get('SELECT SUM(total_amount) as total FROM sales WHERE date(created_at) = date("now")', [], (err, result) => {
+        // Calculate today's sales from BOTH sales table (direct sales) AND bills table (job card sales)
+        db.get(`
+          SELECT
+            COALESCE(SUM(total_amount), 0) as total
+          FROM (
+            SELECT total_amount, created_at FROM sales WHERE date(created_at) = date("now")
+            UNION ALL
+            SELECT total, created_at FROM bills WHERE date(created_at) = date("now") AND status = 'finalized'
+          )
+        `, [], (err, result) => {
           stats.today_sales = result.total || 0;
 
-          db.get('SELECT COUNT(*) as count FROM sales WHERE date(created_at) = date("now")', [], (err, result) => {
+          // Count today's transactions from both sales and bills
+          db.get(`
+            SELECT COUNT(*) as count FROM (
+              SELECT id FROM sales WHERE date(created_at) = date("now")
+              UNION ALL
+              SELECT id FROM bills WHERE date(created_at) = date("now") AND status = 'finalized'
+            )
+          `, [], (err, result) => {
             stats.today_transactions = result.count;
 
-            db.get('SELECT SUM(total_amount) as total FROM sales WHERE date(created_at) >= date("now", "-30 days")', [], (err, result) => {
+            // Calculate monthly sales from BOTH sales and bills
+            db.get(`
+              SELECT
+                COALESCE(SUM(total_amount), 0) as total
+              FROM (
+                SELECT total_amount, created_at FROM sales WHERE date(created_at) >= date("now", "-30 days")
+                UNION ALL
+                SELECT total, created_at FROM bills WHERE date(created_at) >= date("now", "-30 days") AND status = 'finalized'
+              )
+            `, [], (err, result) => {
               stats.monthly_sales = result.total || 0;
 
               db.get('SELECT COUNT(*) as count FROM services WHERE status = "active"', [], (err, result) => {
