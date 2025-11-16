@@ -2179,9 +2179,9 @@ app.post('/api/bills/:id/cancel', authenticateToken, (req, res) => {
 
 // Helper function to generate bill HTML
 function generateBillHTML(bill, customer, items) {
-  // Only show services that have actual pricing (amount > 0)
-  // Services with ₹0.00 are not displayed since labour charge is shown separately
-  const serviceItems = items.filter(item => item.type === 'service' && item.amount > 0);
+  // Show all services performed (tasks)
+  const serviceItems = items.filter(item => item.type === 'service');
+  // Show all parts used
   const partItems = items.filter(item => item.type === 'part');
 
   return `
@@ -2300,27 +2300,24 @@ function generateBillHTML(bill, customer, items) {
   </div>
 
   ${serviceItems.length > 0 ? `
-  <h3 style="margin: 20px 0 10px 0; color: #333;">Services Provided</h3>
+  <h3 style="margin: 20px 0 10px 0; color: #333;">Services Performed</h3>
   <table>
     <thead>
       <tr>
-        <th style="width: 60%;">Service Description</th>
-        <th class="text-right">Qty</th>
-        <th class="text-right">Rate</th>
-        <th class="text-right">Amount</th>
+        <th style="width: 10%;">S.No</th>
+        <th>Service Description</th>
       </tr>
     </thead>
     <tbody>
-      ${serviceItems.map(item => `
+      ${serviceItems.map((item, index) => `
         <tr>
+          <td>${index + 1}</td>
           <td>${item.description}</td>
-          <td class="text-right">${item.quantity}</td>
-          <td class="text-right">₹${item.rate.toFixed(2)}</td>
-          <td class="text-right">₹${item.amount.toFixed(2)}</td>
         </tr>
       `).join('')}
     </tbody>
   </table>
+  <p style="font-size: 12px; color: #666; margin-bottom: 20px;"><em>Note: Service charges are included in the Labour Charge below.</em></p>
   ` : ''}
 
   ${partItems.length > 0 ? `
