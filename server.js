@@ -1358,21 +1358,40 @@ app.get('/api/job-cards/search-customer', authenticateToken, (req, res) => {
 // Create new job card
 app.post('/api/job-cards', authenticateToken, (req, res) => {
   const { customer_id, vehicle_number, tasks, assignee, notes } = req.body;
-  
+
   if (!customer_id || !vehicle_number || !tasks || tasks.length === 0) {
     return res.status(400).json({ error: 'Customer, vehicle number, and at least one task required' });
   }
 
-  const jobCardId = uuidv4();
-  const jobNumber = 'JC-' + Date.now();
-  const createdBy = req.user.username;
+  // Check if there's already an open job card for this vehicle
+  db.get(`
+    SELECT job_number, status
+    FROM job_cards
+    WHERE vehicle_number = ? AND status NOT IN ('completed', 'rejected')
+    ORDER BY created_at DESC
+    LIMIT 1
+  `, [vehicle_number], (err, existingJobCard) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
 
-  db.serialize(() => {
-    // Insert job card
-    db.run(`
-      INSERT INTO job_cards (id, customer_id, vehicle_number, job_number, assignee, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [jobCardId, customer_id, vehicle_number, jobNumber, assignee || null, notes || null, createdBy], function(err) {
+    if (existingJobCard) {
+      return res.status(400).json({
+        error: `An open job card (${existingJobCard.job_number}) already exists for this vehicle. Please complete or reject the existing job card before creating a new one.`,
+        existing_job_number: existingJobCard.job_number
+      });
+    }
+
+    const jobCardId = uuidv4();
+    const jobNumber = 'JC-' + Date.now();
+    const createdBy = req.user.username;
+
+    db.serialize(() => {
+      // Insert job card
+      db.run(`
+        INSERT INTO job_cards (id, customer_id, vehicle_number, job_number, assignee, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [jobCardId, customer_id, vehicle_number, jobNumber, assignee || null, notes || null, createdBy], function(err) {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
@@ -1392,42 +1411,53 @@ app.post('/api/job-cards', authenticateToken, (req, res) => {
           return res.status(500).json({ error: err.message });
         }
 
-        res.json({ 
-          id: jobCardId, 
+        res.json({
+          id: jobCardId,
           job_number: jobNumber,
-          message: 'Job card created successfully' 
+          message: 'Job card created successfully'
         });
       });
+    });
     });
   });
 });
 
 // Get all job cards with filters
 app.get('/api/job-cards', authenticateToken, (req, res) => {
-  const { status, search } = req.query;
-  
+  const { status, search, from_date, to_date } = req.query;
+
   let query = `
     SELECT jc.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email
     FROM job_cards jc
     LEFT JOIN customers c ON jc.customer_id = c.id
     WHERE 1=1
   `;
-  
+
   const params = [];
-  
+
   if (status) {
     query += ` AND jc.status = ?`;
     params.push(status);
   }
-  
+
   if (search) {
     query += ` AND (jc.job_number LIKE ? OR jc.vehicle_number LIKE ? OR c.name LIKE ?)`;
     const searchTerm = `%${search}%`;
     params.push(searchTerm, searchTerm, searchTerm);
   }
-  
+
+  if (from_date) {
+    query += ` AND DATE(jc.created_at) >= DATE(?)`;
+    params.push(from_date);
+  }
+
+  if (to_date) {
+    query += ` AND DATE(jc.created_at) <= DATE(?)`;
+    params.push(to_date);
+  }
+
   query += ` ORDER BY jc.created_at DESC`;
-  
+
   db.all(query, params, (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });

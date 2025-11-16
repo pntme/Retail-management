@@ -302,6 +302,7 @@ const API_URL = window.location.hostname === 'localhost'
       // service history modal
       const [showServiceHistory, setShowServiceHistory] = useState(false);
       const [serviceHistory, setServiceHistory] = useState([]);
+      const [serviceHistoryCustomer, setServiceHistoryCustomer] = useState(null);
 
       const initialForm = {
         name: '',
@@ -388,6 +389,7 @@ const API_URL = window.location.hostname === 'localhost'
       // service history
       const openServiceHistory = async (customer) => {
         setLoadingServiceHistory(true);
+        setServiceHistoryCustomer(customer);
         try {
           const data = await apiCall(`/customers/${customer.id}/service-history`);
           setServiceHistory(data || []);
@@ -608,11 +610,37 @@ const API_URL = window.location.hostname === 'localhost'
 
           {/* Service History modal */}
           {showServiceHistory && (
-            <Modal onClose={() => { setShowServiceHistory(false); setServiceHistory([]); }} wide={true}>
+            <Modal onClose={() => { setShowServiceHistory(false); setServiceHistory([]); setServiceHistoryCustomer(null); }} wide={true}>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Service History</h2>
                 <button onClick={() => window.print()} className="px-3 py-2 bg-gray-200 rounded">Print</button>
               </div>
+
+              {/* Customer Details Card */}
+              {serviceHistoryCustomer && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">Customer Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    <div><span className="font-medium text-gray-700">Name:</span> <span className="text-gray-900">{serviceHistoryCustomer.name}</span></div>
+                    {serviceHistoryCustomer.phone && (
+                      <div><span className="font-medium text-gray-700">Phone:</span> <span className="text-gray-900">{serviceHistoryCustomer.phone}</span></div>
+                    )}
+                    {serviceHistoryCustomer.email && (
+                      <div><span className="font-medium text-gray-700">Email:</span> <span className="text-gray-900">{serviceHistoryCustomer.email}</span></div>
+                    )}
+                    {serviceHistoryCustomer.vehicle_number && (
+                      <div><span className="font-medium text-gray-700">Vehicle:</span> <span className="text-gray-900">{serviceHistoryCustomer.vehicle_number}</span></div>
+                    )}
+                    {serviceHistoryCustomer.vehicle_type && (
+                      <div><span className="font-medium text-gray-700">Vehicle Type:</span> <span className="text-gray-900">{serviceHistoryCustomer.vehicle_type}</span></div>
+                    )}
+                    {serviceHistoryCustomer.address && (
+                      <div className="md:col-span-2"><span className="font-medium text-gray-700">Address:</span> <span className="text-gray-900">{serviceHistoryCustomer.address}</span></div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <SectionLoader loading={loadingServiceHistory} message="Loading service history...">
                 <div className="space-y-4">
                   {serviceHistory.length === 0 ? (
@@ -838,6 +866,7 @@ const API_URL = window.location.hostname === 'localhost'
       // service history modal
       const [showServiceHistory, setShowServiceHistory] = useState(false);
       const [serviceHistory, setServiceHistory] = useState([]);
+      const [serviceHistoryCustomer, setServiceHistoryCustomer] = useState(null);
 
       // call logs modal
       const [showCallLogs, setShowCallLogs] = useState(false);
@@ -869,6 +898,7 @@ const API_URL = window.location.hostname === 'localhost'
 
       const openServiceHistory = async (customer) => {
         setLoadingServiceHistory(true);
+        setServiceHistoryCustomer(customer);
         try {
           const data = await apiCall(`/customers/${customer.id}/service-history`);
           setServiceHistory(data || []);
@@ -1008,11 +1038,37 @@ const API_URL = window.location.hostname === 'localhost'
 
           {/* Service History Modal */}
           {showServiceHistory && (
-            <Modal onClose={() => { setShowServiceHistory(false); setServiceHistory([]); }} wide={true}>
+            <Modal onClose={() => { setShowServiceHistory(false); setServiceHistory([]); setServiceHistoryCustomer(null); }} wide={true}>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold">Service History</h2>
                 <button onClick={() => window.print()} className="px-3 py-2 bg-gray-200 rounded">Print</button>
               </div>
+
+              {/* Customer Details Card */}
+              {serviceHistoryCustomer && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">Customer Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    <div><span className="font-medium text-gray-700">Name:</span> <span className="text-gray-900">{serviceHistoryCustomer.name}</span></div>
+                    {serviceHistoryCustomer.phone && (
+                      <div><span className="font-medium text-gray-700">Phone:</span> <span className="text-gray-900">{serviceHistoryCustomer.phone}</span></div>
+                    )}
+                    {serviceHistoryCustomer.email && (
+                      <div><span className="font-medium text-gray-700">Email:</span> <span className="text-gray-900">{serviceHistoryCustomer.email}</span></div>
+                    )}
+                    {serviceHistoryCustomer.vehicle_number && (
+                      <div><span className="font-medium text-gray-700">Vehicle:</span> <span className="text-gray-900">{serviceHistoryCustomer.vehicle_number}</span></div>
+                    )}
+                    {serviceHistoryCustomer.vehicle_type && (
+                      <div><span className="font-medium text-gray-700">Vehicle Type:</span> <span className="text-gray-900">{serviceHistoryCustomer.vehicle_type}</span></div>
+                    )}
+                    {serviceHistoryCustomer.address && (
+                      <div className="md:col-span-2"><span className="font-medium text-gray-700">Address:</span> <span className="text-gray-900">{serviceHistoryCustomer.address}</span></div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <SectionLoader loading={loadingServiceHistory} message="Loading service history...">
                 <div className="space-y-4">
                   {serviceHistory.length === 0 ? (
@@ -3495,6 +3551,10 @@ const API_URL = window.location.hostname === 'localhost'
       const [filteredJobCards, setFilteredJobCards] = useState([]);
       const [searchTerm, setSearchTerm] = useState('');
       const [statusFilter, setStatusFilter] = useState('');
+      const [fromDate, setFromDate] = useState(() => new Date().toISOString().split('T')[0]);
+      const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
+      const [page, setPage] = useState(1);
+      const pageSize = 10;
       const [showCreateModal, setShowCreateModal] = useState(false);
       const [showViewModal, setShowViewModal] = useState(false);
       const [showAddStockModal, setShowAddStockModal] = useState(false);
@@ -3546,7 +3606,7 @@ const API_URL = window.location.hostname === 'localhost'
       useEffect(() => {
         loadJobCards();
         loadProducts();
-      }, []);
+      }, [fromDate, toDate]);
 
       useEffect(() => {
         filterJobCards();
@@ -3555,11 +3615,16 @@ const API_URL = window.location.hostname === 'localhost'
       const loadJobCards = async () => {
         setLoadingJobCards(true);
         try {
-          const response = await fetch(`${API_URL}/job-cards`, {
+          const params = new URLSearchParams();
+          if (fromDate) params.append('from_date', fromDate);
+          if (toDate) params.append('to_date', toDate);
+
+          const response = await fetch(`${API_URL}/job-cards?${params.toString()}`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
           });
           const data = await response.json();
           setJobCards(data);
+          setPage(1); // Reset to first page when data changes
         } catch (error) {
           console.error('Error loading job cards:', error);
         }
@@ -4037,24 +4102,50 @@ const API_URL = window.location.hostname === 'localhost'
           <h1 className="text-3xl font-bold text-gray-800 mb-6">🔧 Job Cards Management</h1>
           
           <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <div className="flex gap-4 items-center flex-wrap">
-              <input
-                type="text"
-                placeholder="Search by job number, vehicle, customer..."
-                className="flex-1 min-w-[300px] px-4 py-2 border rounded-lg"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <select
-                className="px-4 py-2 border rounded-lg"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All Status</option>
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
-                <option value="rejected">Rejected</option>
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                <input
+                  type="date"
+                  className="w-full px-4 py-2 border rounded-lg"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <input
+                  type="date"
+                  className="w-full px-4 py-2 border rounded-lg"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  className="w-full px-4 py-2 border rounded-lg"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="">All Status</option>
+                  <option value="open">Open</option>
+                  <option value="closed">Closed</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+              <div className="lg:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <input
+                  type="text"
+                  placeholder="Job number, vehicle, customer..."
+                  className="w-full px-4 py-2 border rounded-lg"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -4072,8 +4163,12 @@ const API_URL = window.location.hostname === 'localhost'
                 <p>Create your first job card to get started</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredJobCards.map(job => (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {(() => {
+                    const totalPages = Math.max(1, Math.ceil(filteredJobCards.length / pageSize));
+                    const pagedJobCards = filteredJobCards.slice((page - 1) * pageSize, page * pageSize);
+                    return pagedJobCards.map(job => (
                   <div
                     key={job.id}
                     className={`bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition border-l-4 ${
@@ -4112,8 +4207,31 @@ const API_URL = window.location.hostname === 'localhost'
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                    ));
+                  })()}
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="mt-6 flex justify-center items-center gap-4">
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-gray-700">
+                    Page {page} of {Math.max(1, Math.ceil(filteredJobCards.length / pageSize))}
+                  </span>
+                  <button
+                    disabled={page >= Math.ceil(filteredJobCards.length / pageSize)}
+                    onClick={() => setPage(p => Math.min(Math.ceil(filteredJobCards.length / pageSize), p + 1))}
+                    className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
             )}
           </SectionLoader>
 
@@ -4707,10 +4825,13 @@ const API_URL = window.location.hostname === 'localhost'
     function Bills() {
       const [bills, setBills] = useState([]);
       const [loading, setLoading] = useState(false);
-      const [filters, setFilters] = useState({ from: '', to: '', payment_status: '', search: '' });
+      const todayDate = new Date().toISOString().split('T')[0];
+      const [filters, setFilters] = useState({ from: todayDate, to: todayDate, payment_status: '', search: '' });
       const [viewBill, setViewBill] = useState(null);
+      const [page, setPage] = useState(1);
+      const pageSize = 10;
 
-      useEffect(() => { loadBills(); }, []);
+      useEffect(() => { loadBills(); }, [filters]);
 
       const loadBills = async () => {
         setLoading(true);
@@ -4812,12 +4933,13 @@ const API_URL = window.location.hostname === 'localhost'
               </button>
               <button
                 onClick={() => {
-                  setFilters({ from: '', to: '', payment_status: '', search: '' });
-                  setTimeout(loadBills, 100);
+                  const todayDate = new Date().toISOString().split('T')[0];
+                  setFilters({ from: todayDate, to: todayDate, payment_status: '', search: '' });
+                  setPage(1);
                 }}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
               >
-                Clear Filters
+                Reset to Today
               </button>
             </div>
           </div>
@@ -4845,7 +4967,10 @@ const API_URL = window.location.hostname === 'localhost'
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {bills.map(bill => (
+                    {(() => {
+                      const totalPages = Math.max(1, Math.ceil(bills.length / pageSize));
+                      const pagedBills = bills.slice((page - 1) * pageSize, page * pageSize);
+                      return pagedBills.map(bill => (
                       <tr key={bill.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{bill.bill_number}</td>
                         <td className="px-6 py-4 text-sm text-gray-600">{bill.job_number}</td>
@@ -4883,9 +5008,31 @@ const API_URL = window.location.hostname === 'localhost'
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      ));
+                    })()}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="bg-white px-6 py-4 border-t flex justify-center items-center gap-4">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="px-4 py-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Previous
+                </button>
+                <span className="text-gray-700">
+                  Page {page} of {Math.max(1, Math.ceil(bills.length / pageSize))}
+                </span>
+                <button
+                  disabled={page >= Math.ceil(bills.length / pageSize)}
+                  onClick={() => setPage(p => Math.min(Math.ceil(bills.length / pageSize), p + 1))}
+                  className="px-4 py-2 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Next
+                </button>
               </div>
 
               {/* Summary */}
