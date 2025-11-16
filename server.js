@@ -407,7 +407,7 @@ function getNextBillNumber(callback) {
 }
 
 // Generate bill snapshot from job card
-function generateBillSnapshot(jobCardId, callback) {
+function generateBillSnapshot(jobCardId, labourChargeParam, discountParam, callback) {
   // Get job card details
   db.get(
     `SELECT jc.*, c.name as customer_name, c.phone, c.email, c.vehicle_number, c.vehicle_type
@@ -472,9 +472,9 @@ function generateBillSnapshot(jobCardId, callback) {
                 partsTotal += item.total_price;
               });
 
-              // Calculate totals
-              const labourCharge = jobCard.labour_charge || 0;
-              const discount = jobCard.discount || 0;
+              // Calculate totals - use parameters passed from the completion endpoint
+              const labourCharge = labourChargeParam !== undefined ? labourChargeParam : (jobCard.labour_charge || 0);
+              const discount = discountParam !== undefined ? discountParam : (jobCard.discount || 0);
               const subtotal = partsTotal + labourCharge;
               const total = subtotal - discount;
 
@@ -1839,7 +1839,7 @@ app.post('/api/job-cards/:id/complete', authenticateToken, (req, res) => {
             return res.status(500).json({ error: 'Failed to generate bill number' });
           }
 
-          generateBillSnapshot(jobCardId, (err, billData) => {
+          generateBillSnapshot(jobCardId, labour_charge || 0, discount || 0, (err, billData) => {
             if (err) {
               console.error('Error generating bill snapshot:', err);
               return res.status(500).json({ error: 'Failed to generate bill' });
