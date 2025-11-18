@@ -1494,7 +1494,7 @@ app.post('/api/job-cards', authenticateToken, (req, res) => {
   db.get(`
     SELECT job_number, status
     FROM job_cards
-    WHERE vehicle_number = ? AND status NOT IN ('completed', 'rejected')
+    WHERE vehicle_number = ? AND status = 'open'
     ORDER BY created_at DESC
     LIMIT 1
   `, [vehicle_number], (err, existingJobCard) => {
