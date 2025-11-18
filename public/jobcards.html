@@ -979,135 +979,255 @@
 </div>
 
 <script>
-    // Database simulation (in real app, this would be API calls)
-    let jobCards = [
-        {
-            jobCardNo: '512',
-            customerName: 'Rajesh Kumar',
-            vehicleNo: 'DL01AB1234',
-            inDateTime: '2024-11-15T10:30',
-            status: 'in-progress',
-            estimatedCost: 5500
-        }
-    ];
+console.log('Job Cards page loaded'); // Debug message
 
-    let currentJobCardNo = 513; // Auto-increment
+// API Configuration
+const API_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:3000/api'
+  : '/api';
 
-    // Initialize
-    function init() {
-        const today = new Date();
-        const dateStr = today.toISOString().split('T')[0];
-        const timeStr = today.toTimeString().split(' ')[0].substring(0, 5);
-        
-        document.getElementById('inDate').value = dateStr;
-        document.getElementById('inTime').value = timeStr;
+// Get auth token
+const token = localStorage.getItem('token');
+if (!token) {
+  alert('Not authenticated. Redirecting to login...');
+  window.location.href = '/';
+}
+
+// Check if editing existing job card
+const urlParams = new URLSearchParams(window.location.search);
+const jobCardId = urlParams.get('id');
+const isEditMode = !!jobCardId;
+
+let currentJobCard = null;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, initializing...');
+  if (isEditMode) {
+    loadJobCard(jobCardId);
+  } else {
+    initNewJobCard();
+  }
+
+  // Add back button to grid view
+  const gridHeader = document.querySelector('.grid-header');
+  if (gridHeader) {
+    const backBtn = document.createElement('button');
+    backBtn.className = 'btn btn-primary';
+    backBtn.innerHTML = '← Back to Job Cards List';
+    backBtn.onclick = () => window.location.href = '/#jobcards';
+    gridHeader.insertBefore(backBtn, gridHeader.firstChild);
+  }
+});
+
+// Initialize new job card
+function initNewJobCard() {
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0];
+  const timeStr = today.toTimeString().split(' ')[0].substring(0, 5);
+
+  document.getElementById('inDate').value = dateStr;
+  document.getElementById('inTime').value = timeStr;
+  document.getElementById('jobCardNo').value = 'AUTO';
+
+  // Open modal automatically
+  openJobCardModal();
+}
+
+// Load existing job card
+async function loadJobCard(id) {
+  try {
+    const response = await fetch(`${API_URL}/job-cards/${id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!response.ok) throw new Error('Failed to load job card');
+
+    currentJobCard = await response.json();
+    populateForm(currentJobCard);
+    openJobCardModal();
+  } catch (error) {
+    console.error('Error loading job card:', error);
+    alert('Failed to load job card: ' + error.message);
+    window.location.href = '/#jobcards';
+  }
+}
+
+// Populate form with job card data
+function populateForm(jobCard) {
+  document.getElementById('jobCardNo').value = jobCard.job_number || '';
+  document.getElementById('vehicleTagNo').value = jobCard.vehicle_tag_no || '';
+  document.getElementById('inDate').value = jobCard.in_date || '';
+  document.getElementById('inTime').value = jobCard.in_time || '';
+  document.getElementById('expDeliveryDate').value = jobCard.exp_delivery_date || '';
+  document.getElementById('expDeliveryTime').value = jobCard.exp_delivery_time || '';
+  document.getElementById('outDate').value = jobCard.out_date || '';
+  document.getElementById('outTime').value = jobCard.out_time || '';
+
+  // Priority checkboxes
+  document.getElementById('bookedVehicle').checked = jobCard.priority_booked_vehicle || false;
+  document.getElementById('customerWaiting').checked = jobCard.priority_customer_waiting || false;
+  document.getElementById('repeatJob').checked = jobCard.priority_repeat_job || false;
+
+  // Customer details
+  document.getElementById('customerName').value = jobCard.customer_name || '';
+  document.getElementById('customerAddress').value = jobCard.customer_address || '';
+  document.getElementById('customerPhone').value = jobCard.customer_phone || '';
+  document.getElementById('customerEmail').value = jobCard.customer_email || '';
+
+  // Vehicle details
+  document.getElementById('vehicleModel').value = jobCard.vehicle_model || '';
+  document.getElementById('vehicleType').value = jobCard.vehicle_type || '';
+  document.getElementById('frameNo').value = jobCard.frame_no || '';
+  document.getElementById('engineNo').value = jobCard.engine_no || '';
+  document.getElementById('colour').value = jobCard.colour || '';
+  document.getElementById('registrationNo').value = jobCard.registration_no || jobCard.vehicle_number || '';
+  document.getElementById('kmsRun').value = jobCard.kms_run || '';
+
+  // Service types
+  document.getElementById('paidService').checked = jobCard.service_type_paid || false;
+  document.getElementById('generalRepair').checked = jobCard.service_type_general || false;
+  document.getElementById('amc').checked = jobCard.service_type_amc || false;
+  document.getElementById('accidental').checked = jobCard.service_type_accidental || false;
+  document.getElementById('complaint').checked = jobCard.service_type_complaint || false;
+
+  // Other fields
+  document.getElementById('estimatedCost').value = jobCard.estimated_cost || '';
+  document.getElementById('invoiceNo').value = jobCard.invoice_no || '';
+  document.getElementById('amountRs').value = jobCard.amount_rs || '';
+  document.getElementById('gatePassNo').value = jobCard.gate_pass_no || '';
+  document.getElementById('remarksField').value = jobCard.remarks || '';
+
+  // PSF
+  document.getElementById('psfYes').checked = jobCard.psf_done_yes || false;
+  document.getElementById('psfNo').checked = jobCard.psf_done_no || false;
+
+  // Payment types
+  document.getElementById('paymentCash').checked = jobCard.payment_cash || false;
+  document.getElementById('paymentCard').checked = jobCard.payment_card || false;
+  document.getElementById('paymentCredit').checked = jobCard.payment_credit || false;
+  document.getElementById('paymentWarranty').checked = jobCard.payment_warranty || false;
+}
+
+// Collect form data
+function collectFormData() {
+  return {
+    vehicle_tag_no: document.getElementById('vehicleTagNo').value,
+    in_date: document.getElementById('inDate').value,
+    in_time: document.getElementById('inTime').value,
+    exp_delivery_date: document.getElementById('expDeliveryDate').value,
+    exp_delivery_time: document.getElementById('expDeliveryTime').value,
+    out_date: document.getElementById('outDate').value,
+    out_time: document.getElementById('outTime').value,
+    priority_booked_vehicle: document.getElementById('bookedVehicle').checked ? 1 : 0,
+    priority_customer_waiting: document.getElementById('customerWaiting').checked ? 1 : 0,
+    priority_repeat_job: document.getElementById('repeatJob').checked ? 1 : 0,
+    customer_name: document.getElementById('customerName').value,
+    customer_address: document.getElementById('customerAddress').value,
+    customer_phone: document.getElementById('customerPhone').value,
+    customer_email: document.getElementById('customerEmail').value,
+    vehicle_model: document.getElementById('vehicleModel').value,
+    vehicle_type: document.getElementById('vehicleType').value,
+    frame_no: document.getElementById('frameNo').value,
+    engine_no: document.getElementById('engineNo').value,
+    colour: document.getElementById('colour').value,
+    registration_no: document.getElementById('registrationNo').value,
+    kms_run: parseInt(document.getElementById('kmsRun').value) || null,
+    service_type_paid: document.getElementById('paidService').checked ? 1 : 0,
+    service_type_general: document.getElementById('generalRepair').checked ? 1 : 0,
+    service_type_amc: document.getElementById('amc').checked ? 1 : 0,
+    service_type_accidental: document.getElementById('accidental').checked ? 1 : 0,
+    service_type_complaint: document.getElementById('complaint').checked ? 1 : 0,
+    fuel_level: document.querySelectorAll('.fuel-segment.filled').length,
+    psf_done_yes: document.getElementById('psfYes').checked ? 1 : 0,
+    psf_done_no: document.getElementById('psfNo').checked ? 1 : 0,
+    remarks: document.getElementById('remarksField').value,
+    estimated_cost: parseFloat(document.getElementById('estimatedCost').value) || 0,
+    payment_cash: document.getElementById('paymentCash').checked ? 1 : 0,
+    payment_card: document.getElementById('paymentCard').checked ? 1 : 0,
+    payment_credit: document.getElementById('paymentCredit').checked ? 1 : 0,
+    payment_warranty: document.getElementById('paymentWarranty').checked ? 1 : 0,
+    invoice_no: document.getElementById('invoiceNo').value,
+    amount_rs: parseFloat(document.getElementById('amountRs').value) || 0,
+    gate_pass_no: document.getElementById('gatePassNo').value
+  };
+}
+
+// Save job card
+async function saveJobCard() {
+  const formData = collectFormData();
+
+  // Validation
+  if (!formData.customer_name) {
+    alert('Please enter customer name');
+    return;
+  }
+  if (!formData.registration_no) {
+    alert('Please enter vehicle registration number');
+    return;
+  }
+
+  try {
+    let response;
+
+    if (isEditMode && currentJobCard) {
+      // Update existing job card
+      response = await fetch(`${API_URL}/job-cards/${currentJobCard.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+    } else {
+      // Create new job card - need customer_id and vehicle_number
+      // For now, we'll create a simple job card
+      alert('Please create customers first from the Customers section, then create job cards from there.');
+      window.location.href = '/#customers';
+      return;
     }
 
-    // Create new job card
-    function createNewJobCard() {
-        document.getElementById('jobCardNo').value = currentJobCardNo;
-        document.getElementById('gatePassJobCardNo').textContent = currentJobCardNo;
-        
-        // Reset form
-        document.getElementById('jobCardForm').querySelectorAll('input[type="text"], input[type="email"], input[type="number"], textarea').forEach(input => {
-            if (input.id !== 'jobCardNo' && !input.readOnly) {
-                input.value = '';
-            }
-        });
-        
-        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-        
-        init();
-        openJobCardModal();
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to save job card');
     }
 
-    // View/Edit job card
-    function viewJobCard(jobCardNo) {
-        // Load job card data (would be from API in real app)
-        const jobCard = jobCards.find(jc => jc.jobCardNo == jobCardNo);
-        
-        if (jobCard) {
-            document.getElementById('jobCardNo').value = jobCard.jobCardNo;
-            document.getElementById('customerName').value = jobCard.customerName || '';
-            document.getElementById('registrationNo').value = jobCard.vehicleNo || '';
-            
-            const [date, time] = jobCard.inDateTime.split('T');
-            document.getElementById('inDate').value = date;
-            document.getElementById('inTime').value = time;
-            
-            document.getElementById('estimatedCost').value = jobCard.estimatedCost || '';
-        }
-        
-        openJobCardModal();
-    }
+    alert('Job card saved successfully!');
+    window.location.href = '/#jobcards';
 
-    // Print job card
-    function printJobCard(jobCardNo) {
-        viewJobCard(jobCardNo);
-        setTimeout(() => window.print(), 500);
-    }
+  } catch (error) {
+    console.error('Error saving job card:', error);
+    alert('Failed to save job card: ' + error.message);
+  }
+}
 
-    // Save job card
-    function saveJobCard() {
-        const jobCardData = {
-            jobCardNo: document.getElementById('jobCardNo').value,
-            vehicleTagNo: document.getElementById('vehicleTagNo').value,
-            inDate: document.getElementById('inDate').value,
-            inTime: document.getElementById('inTime').value,
-            expDeliveryDate: document.getElementById('expDeliveryDate').value,
-            expDeliveryTime: document.getElementById('expDeliveryTime').value,
-            customerName: document.getElementById('customerName').value,
-            customerAddress: document.getElementById('customerAddress').value,
-            customerPhone: document.getElementById('customerPhone').value,
-            customerEmail: document.getElementById('customerEmail').value,
-            vehicleModel: document.getElementById('vehicleModel').value,
-            vehicleType: document.getElementById('vehicleType').value,
-            registrationNo: document.getElementById('registrationNo').value,
-            frameNo: document.getElementById('frameNo').value,
-            engineNo: document.getElementById('engineNo').value,
-            colour: document.getElementById('colour').value,
-            kmsRun: document.getElementById('kmsRun').value,
-            estimatedCost: document.getElementById('estimatedCost').value,
-            // Add all other fields...
-        };
+// Modal functions
+function openJobCardModal() {
+  document.getElementById('jobCardModal').classList.add('active');
+  // Hide grid view
+  document.getElementById('gridView').style.display = 'none';
+}
 
-        console.log('Saving job card:', jobCardData);
-        
-        // In real app, make API call to save
-        // await fetch('/api/jobcards', { method: 'POST', body: JSON.stringify(jobCardData) });
-        
-        alert('Job Card saved successfully!');
-        closeJobCardModal();
-        // Refresh grid
-    }
+function closeJobCardModal() {
+  window.location.href = '/#jobcards';
+}
 
-    // Modal functions
-    function openJobCardModal() {
-        document.getElementById('jobCardModal').classList.add('active');
-    }
+// Fuel level toggle
+function toggleFuel(segment) {
+  segment.classList.toggle('filled');
+}
 
-    function closeJobCardModal() {
-        document.getElementById('jobCardModal').classList.remove('active');
-    }
+// Filter job cards (not used in this standalone mode)
+function filterJobCards() {
+  // Not applicable in this version
+}
 
-    // Fuel level toggle
-    function toggleFuel(segment) {
-        segment.classList.toggle('filled');
-    }
-
-    // Filter job cards
-    function filterJobCards() {
-        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        const rows = document.querySelectorAll('#jobCardsBody tr');
-        
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(searchTerm) ? '' : 'none';
-        });
-    }
-
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', init);
+// Print functionality
+function printJobCard() {
+  window.print();
+}
 </script>
 
 </body>
