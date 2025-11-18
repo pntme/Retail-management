@@ -1,0 +1,52 @@
+-- Migration script to update job_cards table for new format
+-- Run this in SQLite to add all missing fields
+
+-- Add all missing fields to job_cards table
+ALTER TABLE job_cards ADD COLUMN vehicle_tag_no TEXT;
+ALTER TABLE job_cards ADD COLUMN in_date DATE;
+ALTER TABLE job_cards ADD COLUMN in_time TIME;
+ALTER TABLE job_cards ADD COLUMN exp_delivery_date DATE;
+ALTER TABLE job_cards ADD COLUMN exp_delivery_time TIME;
+ALTER TABLE job_cards ADD COLUMN out_date DATE;
+ALTER TABLE job_cards ADD COLUMN out_time TIME;
+ALTER TABLE job_cards ADD COLUMN priority_booked_vehicle INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN priority_customer_waiting INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN priority_repeat_job INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN customer_name TEXT;
+ALTER TABLE job_cards ADD COLUMN customer_address TEXT;
+ALTER TABLE job_cards ADD COLUMN customer_phone TEXT;
+ALTER TABLE job_cards ADD COLUMN customer_email TEXT;
+ALTER TABLE job_cards ADD COLUMN vehicle_model TEXT;
+ALTER TABLE job_cards ADD COLUMN vehicle_type TEXT;
+ALTER TABLE job_cards ADD COLUMN frame_no TEXT;
+ALTER TABLE job_cards ADD COLUMN engine_no TEXT;
+ALTER TABLE job_cards ADD COLUMN colour TEXT;
+ALTER TABLE job_cards ADD COLUMN registration_no TEXT;
+ALTER TABLE job_cards ADD COLUMN kms_run INTEGER;
+ALTER TABLE job_cards ADD COLUMN service_type_paid INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN service_type_paid_no TEXT;
+ALTER TABLE job_cards ADD COLUMN service_type_general INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN service_type_amc INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN service_type_accidental INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN service_type_complaint INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN fuel_level INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN psf_done_yes INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN psf_done_no INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN remarks TEXT;
+ALTER TABLE job_cards ADD COLUMN additional_voice TEXT;
+ALTER TABLE job_cards ADD COLUMN final_service_remarks TEXT;
+ALTER TABLE job_cards ADD COLUMN vehicle_checklist TEXT;
+ALTER TABLE job_cards ADD COLUMN customer_request TEXT;
+ALTER TABLE job_cards ADD COLUMN service_advisor_name TEXT;
+ALTER TABLE job_cards ADD COLUMN technician_name TEXT;
+ALTER TABLE job_cards ADD COLUMN test_ride_opening TEXT;
+ALTER TABLE job_cards ADD COLUMN test_ride_closing TEXT;
+ALTER TABLE job_cards ADD COLUMN estimated_cost REAL DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN payment_cash INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN payment_card INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN payment_credit INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN payment_warranty INTEGER DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN invoice_no TEXT;
+ALTER TABLE job_cards ADD COLUMN amount_rs REAL DEFAULT 0;
+ALTER TABLE job_cards ADD COLUMN gate_pass_no TEXT;
+ALTER TABLE job_cards ADD COLUMN customer_signature_date DATE;

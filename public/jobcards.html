@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Job Cards - Jyoti Auto Parts</title>
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -15,79 +13,51 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
             padding: 20px;
         }
 
-        .container {
+        /* Grid View Styles */
+        .grid-container {
             max-width: 1400px;
             margin: 0 auto;
             background: white;
-            border-radius: 20px;
+            border-radius: 10px;
             padding: 30px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
-        h1 {
-            color: #667eea;
-            margin-bottom: 30px;
-            text-align: center;
-            font-size: 2.5em;
-        }
-
-        .top-actions {
+        .grid-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
-            gap: 15px;
-            flex-wrap: wrap;
         }
 
-        .search-filter-group {
-            display: flex;
-            gap: 10px;
-            flex: 1;
-            min-width: 300px;
-        }
-
-        input[type="text"], select {
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 14px;
-            transition: all 0.3s;
-            flex: 1;
-        }
-
-        input[type="text"]:focus, select:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        .grid-header h1 {
+            color: #333;
+            font-size: 28px;
         }
 
         .btn {
-            padding: 12px 25px;
+            padding: 12px 24px;
             border: none;
-            border-radius: 10px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
             font-weight: 600;
             transition: all 0.3s;
-            text-decoration: none;
-            display: inline-block;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #667eea;
             color: white;
         }
 
         .btn-primary:hover {
+            background: #5568d3;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
         .btn-success {
@@ -95,105 +65,83 @@
             color: white;
         }
 
-        .btn-danger {
-            background: #ef4444;
+        .btn-info {
+            background: #3b82f6;
             color: white;
+            padding: 8px 16px;
+            font-size: 12px;
         }
 
-        .btn-secondary {
-            background: #6b7280;
+        .btn-print {
+            background: #f59e0b;
             color: white;
+            padding: 8px 16px;
+            font-size: 12px;
         }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .search-box {
+            margin-bottom: 20px;
         }
 
-        .job-cards-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
+        .search-box input {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            width: 300px;
+            font-size: 14px;
+        }
+
+        /* Job Cards Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 20px;
         }
 
-        .job-card {
-            background: white;
-            border: 2px solid #e0e0e0;
-            border-radius: 15px;
-            padding: 20px;
-            transition: all 0.3s;
-            cursor: pointer;
+        thead {
+            background: #f9fafb;
         }
 
-        .job-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
-            transform: translateY(-2px);
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 2px solid #e5e7eb;
         }
 
-        .job-card.open {
-            border-left: 5px solid #10b981;
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
         }
 
-        .job-card.closed {
-            border-left: 5px solid #6b7280;
-        }
-
-        .job-card.rejected {
-            border-left: 5px solid #ef4444;
-        }
-
-        .job-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 15px;
-        }
-
-        .job-number {
-            font-size: 18px;
-            font-weight: bold;
-            color: #667eea;
+        tbody tr:hover {
+            background: #f9fafb;
         }
 
         .status-badge {
-            padding: 5px 12px;
-            border-radius: 20px;
+            padding: 4px 12px;
+            border-radius: 12px;
             font-size: 12px;
             font-weight: 600;
-            text-transform: uppercase;
         }
 
-        .status-badge.open {
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-in-progress {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-completed {
             background: #d1fae5;
             color: #065f46;
         }
 
-        .status-badge.closed {
-            background: #e5e7eb;
-            color: #374151;
-        }
-
-        .status-badge.rejected {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .job-card-info {
-            margin-bottom: 10px;
-        }
-
-        .job-card-info strong {
-            color: #374151;
-            display: block;
-            margin-bottom: 3px;
-        }
-
-        .job-card-info span {
-            color: #6b7280;
-        }
-
+        /* Job Card Form - Modal */
         .modal {
             display: none;
             position: fixed;
@@ -201,1933 +149,966 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0,0,0,0.5);
             z-index: 1000;
             overflow-y: auto;
         }
 
         .modal.active {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            display: block;
         }
 
         .modal-content {
             background: white;
-            border-radius: 20px;
-            padding: 30px;
-            max-width: 900px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            margin: 20px auto;
+            max-width: 1200px;
+            border-radius: 8px;
+            position: relative;
         }
 
-        .modal-header {
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        /* Job Card Print Layout */
+        .job-card {
+            padding: 40px;
+            background: white;
+        }
+
+        .job-card-header {
+            border: 2px solid #000;
+            padding: 15px;
+            margin-bottom: 0;
+        }
+
+        .job-card-header-top {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e0e0e0;
-        }
-
-        .modal-header h2 {
-            color: #667eea;
-            font-size: 24px;
-        }
-
-        .close-btn {
-            font-size: 28px;
-            color: #6b7280;
-            cursor: pointer;
-            border: none;
-            background: none;
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .close-btn:hover {
-            color: #ef4444;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #374151;
-            font-weight: 600;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        .form-group textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        .tasks-list {
-            margin-bottom: 15px;
-        }
-
-        .task-item {
-            display: flex;
-            gap: 10px;
+            align-items: flex-start;
             margin-bottom: 10px;
         }
 
-        .task-item input {
-            flex: 1;
-        }
-
-        .btn-small {
-            padding: 8px 15px;
-            font-size: 12px;
-        }
-
-        .section {
-            margin-bottom: 30px;
-        }
-
-        .section h3 {
-            color: #374151;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #e0e0e0;
-        }
-
-        .detail-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .detail-item {
-            padding: 15px;
-            background: #f9fafb;
-            border-radius: 10px;
-        }
-
-        .detail-item strong {
-            display: block;
-            color: #6b7280;
-            font-size: 12px;
+        .company-info h2 {
+            font-size: 24px;
+            font-weight: bold;
             margin-bottom: 5px;
         }
 
-        .detail-item span {
-            color: #111827;
-            font-size: 16px;
-            font-weight: 600;
+        .company-info p {
+            font-size: 11px;
+            margin: 2px 0;
         }
 
-        .task-list-view {
-            list-style: none;
+        .job-card-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            background: #f0f0f0;
+            padding: 8px;
+            margin: 10px -15px;
         }
 
-        .task-list-view li {
-            padding: 12px;
-            background: #f9fafb;
-            border-radius: 8px;
-            margin-bottom: 10px;
+        .header-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .field-group {
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .field-group label {
+            font-weight: bold;
+            margin-right: 8px;
+            white-space: nowrap;
+        }
+
+        .field-group input[type="text"],
+        .field-group input[type="date"],
+        .field-group input[type="time"],
+        .field-group input[type="number"] {
+            flex: 1;
+            border: none;
+            border-bottom: 1px solid #000;
+            padding: 4px;
+            font-size: 12px;
+        }
+
+        .priority-section {
+            display: flex;
+            gap: 15px;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Customer & Vehicle Details */
+        .details-section {
+            border: 2px solid #000;
+            border-top: none;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .customer-details {
+            border-right: 2px solid #000;
+            padding: 10px;
+        }
+
+        .vehicle-details {
+            padding: 10px;
+        }
+
+        .section-title {
+            background: #f0f0f0;
+            padding: 5px;
+            font-weight: bold;
+            font-size: 13px;
+            margin: -10px -10px 10px -10px;
+            text-align: center;
+        }
+
+        .form-row {
+            display: flex;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .form-row label {
+            width: 100px;
+            font-weight: bold;
+        }
+
+        .form-row input,
+        .form-row textarea {
+            flex: 1;
+            border: none;
+            border-bottom: 1px solid #999;
+            padding: 2px 5px;
+            font-size: 12px;
+        }
+
+        /* Service Type & Condition */
+        .service-condition-section {
+            border: 2px solid #000;
+            border-top: none;
+            display: grid;
+            grid-template-columns: 200px 1fr 200px;
+        }
+
+        .service-type {
+            border-right: 2px solid #000;
+            padding: 10px;
+        }
+
+        .vehicle-condition {
+            border-right: 2px solid #000;
+            padding: 10px;
+        }
+
+        .fuel-remarks {
+            padding: 10px;
+        }
+
+        .service-checkboxes {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        /* Vehicle Diagram */
+        .vehicle-diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 120px;
+            margin: 10px 0;
+        }
+
+        .scooter-icons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .scooter-icon {
+            font-size: 40px;
+        }
+
+        .fuel-level {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .fuel-bar {
+            display: flex;
+            gap: 2px;
+        }
+
+        .fuel-segment {
+            width: 30px;
+            height: 15px;
+            border: 1px solid #000;
+            cursor: pointer;
+        }
+
+        .fuel-segment.filled {
+            background: #333;
+        }
+
+        /* Checklist Section */
+        .checklist-section {
+            border: 2px solid #000;
+            border-top: none;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+        }
+
+        .checklist-column {
+            border-right: 2px solid #000;
+            padding: 10px;
+        }
+
+        .checklist-column:last-child {
+            border-right: none;
+        }
+
+        .checklist-items {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 11px;
+        }
+
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .checklist-item input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Bottom Section */
+        .bottom-section {
+            border: 2px solid #000;
+            border-top: none;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .advisor-tech-section {
+            border-right: 2px solid #000;
+            padding: 10px;
+        }
+
+        .cost-payment-section {
+            padding: 10px;
+        }
+
+        .signature-section {
+            border: 2px solid #000;
+            border-top: none;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            padding: 15px;
+        }
+
+        .signature-box {
+            text-align: center;
+        }
+
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 40px;
+            padding-top: 5px;
+            font-size: 12px;
+        }
+
+        /* Gate Pass */
+        .gate-pass {
+            border: 2px solid #000;
+            margin-top: 20px;
+            padding: 15px;
+        }
+
+        .gate-pass-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #000;
         }
 
-        .stock-items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
+        /* Print Styles */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .grid-container,
+            .modal {
+                display: none;
+            }
+
+            .job-card {
+                display: block !important;
+                padding: 20px;
+            }
+
+            .btn,
+            .modal-close,
+            .no-print {
+                display: none !important;
+            }
         }
 
-        .stock-items-table th,
-        .stock-items-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .stock-items-table th {
-            background: #f9fafb;
-            font-weight: 600;
-            color: #374151;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-
-        .search-results {
-            position: absolute;
-            background: white;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            max-height: 300px;
-            overflow-y: auto;
-            width: 100%;
-            z-index: 100;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .search-result-item {
-            padding: 12px 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #f3f4f6;
-        }
-
-        .search-result-item:hover {
-            background: #f9fafb;
-        }
-
-        .search-result-item strong {
-            display: block;
-            color: #111827;
-        }
-
-        .search-result-item small {
-            color: #6b7280;
-        }
-
-        .empty-state {
+        .print-actions {
+            padding: 20px;
             text-align: center;
-            padding: 60px 20px;
-            color: #6b7280;
+            border-bottom: 2px solid #e0e0e0;
         }
 
-        .empty-state svg {
-            width: 100px;
-            height: 100px;
-            margin-bottom: 20px;
-            opacity: 0.3;
-        }
-
-        .nav-back {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 600;
-            margin-bottom: 20px;
-        }
-
-        .nav-back:hover {
-            color: #764ba2;
-        }
-
-        @media (max-width: 768px) {
-            .top-actions {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .job-cards-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .detail-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Loading Spinner Styles */
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .spinner {
-            border: 3px solid #f3f4f6;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-
-        .loading-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-        }
-
-        .loading-overlay.active {
-            display: flex;
-        }
-
-        .loading-overlay .spinner {
-            width: 60px;
-            height: 60px;
-            border-width: 4px;
-        }
-
-        .loading-overlay .loading-message {
-            color: white;
-            margin-top: 20px;
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        .btn-loading {
-            position: relative;
-            color: transparent !important;
-            pointer-events: none;
-        }
-
-        .btn-loading::after {
-            content: '';
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            top: 50%;
-            left: 50%;
-            margin-left: -8px;
-            margin-top: -8px;
-            border: 2px solid transparent;
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-        }
-
-        .section-loader {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            color: #6b7280;
-        }
-
-        .section-loader .spinner {
-            margin-bottom: 15px;
-        }
-
-        .section-loader .loading-message {
-            font-size: 14px;
+        .print-actions .btn {
+            margin: 0 10px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <a href="index.html" class="nav-back">← Back to Dashboard</a>
+
+<!-- Grid View -->
+<div class="grid-container" id="gridView">
+    <div class="grid-header">
+        <h1>Job Cards</h1>
+        <button class="btn btn-primary" onclick="createNewJobCard()">+ Create New Job Card</button>
+    </div>
+
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Search by Job Card No., Customer Name, Vehicle No..." oninput="filterJobCards()">
+    </div>
+
+    <table id="jobCardsTable">
+        <thead>
+            <tr>
+                <th>Job Card No.</th>
+                <th>Customer Name</th>
+                <th>Vehicle No.</th>
+                <th>In Date/Time</th>
+                <th>Status</th>
+                <th>Estimated Cost</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="jobCardsBody">
+            <!-- Sample Data -->
+            <tr>
+                <td>512</td>
+                <td>Rajesh Kumar</td>
+                <td>DL01AB1234</td>
+                <td>2024-11-15 10:30 AM</td>
+                <td><span class="status-badge status-in-progress">In Progress</span></td>
+                <td>₹5,500</td>
+                <td>
+                    <button class="btn btn-info" onclick="viewJobCard(512)">View/Edit</button>
+                    <button class="btn btn-print" onclick="printJobCard(512)">Print</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Job Card Form Modal -->
+<div class="modal" id="jobCardModal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeJobCardModal()">&times;</span>
         
-        <h1>🔧 Job Cards Management</h1>
-
-        <div class="top-actions">
-            <div class="search-filter-group">
-                <input type="text" id="searchInput" placeholder="Search by job number, vehicle number, customer...">
-                <select id="statusFilter">
-                    <option value="">All Status</option>
-                    <option value="open">Open</option>
-                    <option value="closed">Closed</option>
-                    <option value="rejected">Rejected</option>
-                </select>
-            </div>
-            <button class="btn btn-primary" onclick="openCreateJobCardModal()">+ Create Job Card</button>
+        <div class="print-actions no-print">
+            <button class="btn btn-success" onclick="saveJobCard()">Save Job Card</button>
+            <button class="btn btn-print" onclick="window.print()">Print Job Card</button>
+            <button class="btn" onclick="closeJobCardModal()">Close</button>
         </div>
 
-        <div id="jobCardsGrid" class="job-cards-grid">
-            <!-- Job cards will be loaded here -->
-        </div>
-
-        <div id="emptyState" class="empty-state" style="display: none;">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-            <h3>No job cards found</h3>
-            <p>Create your first job card to get started</p>
-        </div>
-    </div>
-
-    <!-- Create Job Card Modal -->
-    <div id="createJobCardModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Create New Job Card</h2>
-                <button class="close-btn" onclick="closeCreateJobCardModal()">×</button>
-            </div>
-
-            <div class="form-group">
-                <label>Search Customer *</label>
-                <div style="position: relative;">
-                    <input type="text" id="customerSearch" placeholder="Search by name, phone, email, or vehicle number..." autocomplete="off">
-                    <div id="customerSearchResults" class="search-results" style="display: none;"></div>
-                </div>
-                <input type="hidden" id="selectedCustomerId">
-                <div id="selectedCustomerInfo" style="margin-top: 10px; padding: 10px; background: #f9fafb; border-radius: 8px; display: none;">
-                    <strong id="selectedCustomerName"></strong>
-                    <small id="selectedCustomerDetails" style="display: block; color: #6b7280;"></small>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>Vehicle Number *</label>
-                <input type="text" id="vehicleNumber" placeholder="Enter vehicle number">
-            </div>
-
-            <div class="form-group">
-                <label>Tasks/Requirements *</label>
-                <div id="tasksList" class="tasks-list">
-                    <div class="task-item">
-                        <input type="text" class="task-input" placeholder="e.g., Change engine oil">
-                        <button class="btn btn-danger btn-small" onclick="removeTask(this)">Remove</button>
+        <div class="job-card" id="jobCardForm">
+            <!-- Header Section -->
+            <div class="job-card-header">
+                <div class="job-card-header-top">
+                    <div class="company-info">
+                        <h2>JYOTI AUTO PARTS</h2>
+                        <p>Near Hata Road Petrol Pump</p>
+                        <p>Se 200 Meter Aage, Purwa Chauraha, Deoria</p>
+                        <p>GSTIN: 09ZPDP5217B1ZW</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="field-group" style="justify-content: flex-end; margin-bottom: 8px;">
+                            <label>JOB CARD No.</label>
+                            <input type="text" id="jobCardNo" style="width: 100px; font-weight: bold; font-size: 16px;" readonly>
+                        </div>
+                        <div class="field-group" style="justify-content: flex-end;">
+                            <label>Vehicle Tag No.</label>
+                            <input type="text" id="vehicleTagNo" style="width: 100px;">
+                        </div>
                     </div>
                 </div>
-                <button class="btn btn-secondary btn-small" onclick="addTask()">+ Add Task</button>
+
+                <div class="job-card-title">JOB CARD</div>
+
+                <div class="header-fields">
+                    <div class="field-group">
+                        <label>In Date/Time:</label>
+                        <input type="date" id="inDate" style="width: 110px;">
+                        <input type="time" id="inTime" style="width: 80px;">
+                    </div>
+                    <div class="field-group">
+                        <label>Exp. Delivery:</label>
+                        <input type="date" id="expDeliveryDate" style="width: 110px;">
+                        <input type="time" id="expDeliveryTime" style="width: 80px;">
+                    </div>
+                    <div class="field-group">
+                        <label>Out Date/Time:</label>
+                        <input type="date" id="outDate" style="width: 110px;">
+                        <input type="time" id="outTime" style="width: 80px;">
+                    </div>
+                </div>
+
+                <div class="priority-section">
+                    <strong>PRIORITY IDENTIFICATION:</strong>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="bookedVehicle">
+                        <label for="bookedVehicle">Booked Vehicle</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="customerWaiting">
+                        <label for="customerWaiting">Customer Waiting</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="repeatJob">
+                        <label for="repeatJob">Repeat Job</label>
+                    </div>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label>Assignee</label>
-                <input type="text" id="assignee" placeholder="Person responsible for this job">
+            <!-- Customer & Vehicle Details -->
+            <div class="details-section">
+                <div class="customer-details">
+                    <div class="section-title">CUSTOMER DETAILS</div>
+                    <div class="form-row">
+                        <label>Name:</label>
+                        <input type="text" id="customerName">
+                    </div>
+                    <div class="form-row">
+                        <label>Address:</label>
+                        <textarea id="customerAddress" rows="2"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <label>Phone No.:</label>
+                        <input type="text" id="customerPhone">
+                    </div>
+                    <div class="form-row">
+                        <label>E-Mail:</label>
+                        <input type="email" id="customerEmail">
+                    </div>
+                </div>
+
+                <div class="vehicle-details">
+                    <div class="section-title">VEHICLE DETAILS</div>
+                    <div class="form-row">
+                        <label>MODEL:</label>
+                        <input type="text" id="vehicleModel">
+                    </div>
+                    <div class="form-row">
+                        <label>TYPE:</label>
+                        <input type="text" id="vehicleType">
+                    </div>
+                    <div class="form-row">
+                        <label>FRAME NO.:</label>
+                        <input type="text" id="frameNo">
+                    </div>
+                    <div class="form-row">
+                        <label>ENGINE NO.:</label>
+                        <input type="text" id="engineNo">
+                    </div>
+                    <div class="form-row">
+                        <label>COLOUR:</label>
+                        <input type="text" id="colour">
+                    </div>
+                    <div class="form-row">
+                        <label>REGISTRATION NO:</label>
+                        <input type="text" id="registrationNo">
+                    </div>
+                    <div class="form-row">
+                        <label>KMS RUN:</label>
+                        <input type="number" id="kmsRun">
+                    </div>
+                </div>
             </div>
 
-            <div class="form-group">
-                <label>Notes</label>
-                <textarea id="jobNotes" placeholder="Additional notes or instructions..."></textarea>
-            </div>
+            <!-- Service Type & Condition -->
+            <div class="service-condition-section">
+                <div class="service-type">
+                    <div class="section-title">TYPE OF SERVICE</div>
+                    <div class="service-checkboxes">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="paidService">
+                            <label for="paidService">Paid Service No.</label>
+                            <input type="text" style="width: 60px; margin-left: 5px;">
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="generalRepair">
+                            <label for="generalRepair">General Repair</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="amc">
+                            <label for="amc">AMC</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="accidental">
+                            <label for="accidental">Accidental</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="complaint">
+                            <label for="complaint">Complaint</label>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="createJobCard()">Create Job Card</button>
-                <button class="btn btn-secondary" onclick="closeCreateJobCardModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- View Job Card Modal -->
-    <div id="viewJobCardModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="jobCardTitle">Job Card Details</h2>
-                <button class="close-btn" onclick="closeViewJobCardModal()">×</button>
-            </div>
-
-            <div id="jobCardDetails">
-                <!-- Details will be loaded here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Stock Item Modal -->
-    <div id="addStockModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Add Stock Item</h2>
-                <button class="close-btn" onclick="closeAddStockModal()">×</button>
-            </div>
-
-            <div class="form-group">
-                <label>Product *</label>
-                <select id="stockProductId" class="select2">
-                    <option value="">Select product...</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Quantity *</label>
-                <input type="number" id="stockQuantity" min="1" value="1">
-            </div>
-
-            <div class="form-group">
-                <label>Unit Price (₹) *</label>
-                <input type="number" id="stockUnitPrice" min="0" step="0.01">
-            </div>
-
-            <div class="form-group">
-                <label>Notes</label>
-                <textarea id="stockNotes" placeholder="Additional information..."></textarea>
-            </div>
-
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="addStockItem()">Add Stock</button>
-                <button class="btn btn-secondary" onclick="closeAddStockModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Complete & Bill Modal -->
-    <div id="completeBillModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Complete & Generate Bill</h2>
-                <button class="close-btn" onclick="closeCompleteBillModal()">×</button>
-            </div>
-
-            <div class="form-group">
-                <label>Labour Charge (₹) *</label>
-                <input type="number" id="labourCharge" min="0" step="0.01" value="0" placeholder="Enter labour charges">
-            </div>
-
-            <div class="form-group">
-                <label>Discount (₹)</label>
-                <input type="number" id="billDiscount" min="0" step="0.01" value="0" placeholder="Enter discount amount">
-            </div>
-
-            <div class="form-group">
-                <label>Last Service Date</label>
-                <input type="date" id="lastServiceDate">
-            </div>
-
-            <div class="form-group">
-                <label>Next Service Date</label>
-                <input type="date" id="nextServiceDate">
-            </div>
-
-            <div class="action-buttons">
-                <button class="btn btn-success" onclick="submitCompleteAndBill()">Complete & Bill</button>
-                <button class="btn btn-secondary" onclick="closeCompleteBillModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Job Card Modal -->
-    <div id="editJobCardModal" class="modal">
-        <div class="modal-content" style="max-width: 800px;">
-            <div class="modal-header">
-                <h2>Edit Job Card</h2>
-                <button class="close-btn" onclick="closeEditJobCardModal()">×</button>
-            </div>
-
-            <div class="form-group">
-                <label>Status *</label>
-                <select id="editStatus">
-                    <option value="open">Open</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="closed">Closed</option>
-                    <option value="rejected">Rejected</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Assignee</label>
-                <input type="text" id="editAssignee" placeholder="Enter assignee name">
-            </div>
-
-            <div class="form-group">
-                <label>Labour Charge (₹)</label>
-                <input type="number" id="editLabourCharge" min="0" step="0.01" value="0">
-            </div>
-
-            <div class="form-group">
-                <label>Discount (₹)</label>
-                <input type="number" id="editDiscount" min="0" step="0.01" value="0">
-            </div>
-
-            <div class="form-group">
-                <label>Notes</label>
-                <textarea id="editNotes" placeholder="Additional notes..."></textarea>
-            </div>
-
-            <div class="form-group">
-                <label>Last Service Date</label>
-                <input type="date" id="editLastServiceDate">
-            </div>
-
-            <div class="form-group">
-                <label>Next Service Date</label>
-                <input type="date" id="editNextServiceDate">
-            </div>
-
-            <h3>Tasks</h3>
-            <div id="editTasksList"></div>
-            <button class="btn btn-secondary" style="margin-top: 10px;" onclick="addEditTask()">+ Add Task</button>
-
-            <div class="action-buttons" style="margin-top: 20px;">
-                <button class="btn btn-success" onclick="submitEditJobCard()">Save Changes</button>
-                <button class="btn btn-secondary" onclick="closeEditJobCardModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Generic Message Modal -->
-    <div id="messageModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
-            <div class="modal-header">
-                <h2 id="messageModalTitle">Message</h2>
-                <button class="close-btn" onclick="closeMessageModal()">×</button>
-            </div>
-            <div style="padding: 20px;">
-                <p id="messageModalText" style="font-size: 16px; line-height: 1.6; color: #374151;"></p>
-            </div>
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="closeMessageModal()">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="spinner"></div>
-        <div class="loading-message" id="loadingMessage">Loading...</div>
-    </div>
-
-    <script>
-        const API_URL = 'http://localhost:3001/api';
-        let token = localStorage.getItem('token');
-        let currentJobCardId = null;
-        let currentJobCardData = null;
-        let editJobCardData = null;
-
-        if (!token) {
-            window.location.href = '/';
-        }
-
-        // Loading Helper Functions
-        function showLoadingOverlay(message = 'Loading...') {
-            const overlay = document.getElementById('loadingOverlay');
-            const messageEl = document.getElementById('loadingMessage');
-            messageEl.textContent = message;
-            overlay.classList.add('active');
-        }
-
-        function hideLoadingOverlay() {
-            const overlay = document.getElementById('loadingOverlay');
-            overlay.classList.remove('active');
-        }
-
-        function setButtonLoading(button, loading) {
-            if (loading) {
-                button.disabled = true;
-                button.classList.add('btn-loading');
-                button.dataset.originalText = button.textContent;
-            } else {
-                button.disabled = false;
-                button.classList.remove('btn-loading');
-                if (button.dataset.originalText) {
-                    button.textContent = button.dataset.originalText;
-                }
-            }
-        }
-
-        function showSectionLoader(container, message = 'Loading...') {
-            const loader = document.createElement('div');
-            loader.className = 'section-loader';
-            loader.innerHTML = `
-                <div class="spinner"></div>
-                <div class="loading-message">${message}</div>
-            `;
-            container.innerHTML = '';
-            container.appendChild(loader);
-        }
-
-        function hideSectionLoader(container) {
-            const loader = container.querySelector('.section-loader');
-            if (loader) {
-                loader.remove();
-            }
-        }
-
-        // Load job cards
-        function loadJobCards() {
-            const search = document.getElementById('searchInput').value;
-            const status = document.getElementById('statusFilter').value;
-            const grid = document.getElementById('jobCardsGrid');
-            const emptyState = document.getElementById('emptyState');
-
-            // Show section loader
-            emptyState.style.display = 'none';
-            grid.style.display = 'block';
-            showSectionLoader(grid, 'Loading job cards...');
-
-            let url = `${API_URL}/job-cards?`;
-            if (search) url += `search=${encodeURIComponent(search)}&`;
-            if (status) url += `status=${status}`;
-
-            fetch(url, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.length === 0) {
-                    grid.style.display = 'none';
-                    emptyState.style.display = 'block';
-                } else {
-                    grid.style.display = 'grid';
-                    emptyState.style.display = 'none';
-                    grid.innerHTML = data.map(job => `
-                        <div class="job-card ${job.status}" onclick="viewJobCard('${job.id}')">
-                            <div class="job-card-header">
-                                <div class="job-number">${job.job_number}</div>
-                                <div class="status-badge ${job.status}">${job.status}</div>
+                <div class="vehicle-condition">
+                    <div class="section-title">PHYSICAL & PAINT CONDITION OF VEHICLE</div>
+                    <div class="vehicle-diagram">
+                        <div class="scooter-icons">
+                            <div style="text-align: center;">
+                                <span class="scooter-icon">🛵</span>
+                                <div style="font-size: 9px; margin-top: -5px;">Left</div>
                             </div>
-                            <div class="job-card-info">
-                                <strong>Customer</strong>
-                                <span>${job.customer_name}</span>
+                            <div style="text-align: center;">
+                                <span class="scooter-icon">🛵</span>
+                                <div style="font-size: 9px; margin-top: -5px;">Right</div>
                             </div>
-                            <div class="job-card-info">
-                                <strong>Vehicle</strong>
-                                <span>${job.vehicle_number}</span>
+                            <div style="text-align: center;">
+                                <span class="scooter-icon">🏍️</span>
+                                <div style="font-size: 9px; margin-top: -5px;">Left</div>
                             </div>
-                            ${job.assignee ? `
-                                <div class="job-card-info">
-                                    <strong>Assignee</strong>
-                                    <span>${job.assignee}</span>
-                                </div>
-                            ` : ''}
-                            <div class="job-card-info">
-                                <strong>Created</strong>
-                                <span>${new Date(job.created_at).toLocaleString()}</span>
+                            <div style="text-align: center;">
+                                <span class="scooter-icon">🏍️</span>
+                                <div style="font-size: 9px; margin-top: -5px;">Right</div>
                             </div>
                         </div>
-                    `).join('');
-                }
-            })
-            .catch(error => {
-                console.error('Error loading job cards:', error);
-                grid.innerHTML = '';
-                showModal('Error', 'Failed to load job cards');
-            });
-        }
+                    </div>
+                </div>
 
-        // Search customers
-        let searchTimeout;
-        document.getElementById('customerSearch').addEventListener('input', function(e) {
-            clearTimeout(searchTimeout);
-            const search = e.target.value.trim();
-            const resultsDiv = document.getElementById('customerSearchResults');
-
-            if (search.length < 2) {
-                resultsDiv.style.display = 'none';
-                return;
-            }
-
-            // Show loading state
-            resultsDiv.innerHTML = '<div class="search-result-item"><div style="display: flex; align-items: center; justify-content: center; padding: 10px;"><div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div></div></div>';
-            resultsDiv.style.display = 'block';
-
-            searchTimeout = setTimeout(() => {
-                fetch(`${API_URL}/job-cards/search-customer?search=${encodeURIComponent(search)}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.length === 0) {
-                        resultsDiv.innerHTML = '<div class="search-result-item">No customers found</div>';
-                    } else {
-                        resultsDiv.innerHTML = data.map(customer => `
-                            <div class="search-result-item" onclick="selectCustomer('${customer.id}', '${customer.name}', '${customer.phone || ''}', '${customer.vehicle_number || ''}')">
-                                <strong>${customer.name}</strong>
-                                <small>${customer.phone || ''} ${customer.vehicle_number ? '• ' + customer.vehicle_number : ''}</small>
+                <div class="fuel-remarks">
+                    <div class="section-title">Fuel Level</div>
+                    <div class="fuel-level" style="margin-top: 10px;">
+                        <span style="font-size: 11px;">E</span>
+                        <div class="fuel-bar">
+                            <div class="fuel-segment" onclick="toggleFuel(this)"></div>
+                            <div class="fuel-segment" onclick="toggleFuel(this)"></div>
+                            <div class="fuel-segment" onclick="toggleFuel(this)"></div>
+                            <div class="fuel-segment" onclick="toggleFuel(this)"></div>
+                        </div>
+                        <span style="font-size: 11px;">F</span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 11px;">
+                        <strong>Next Service Follow up:</strong>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <strong style="font-size: 11px;">PSF Done:</strong>
+                        <div style="margin-top: 5px;">
+                            <div class="checkbox-group" style="display: inline-flex; margin-right: 10px;">
+                                <input type="checkbox" id="psfYes">
+                                <label for="psfYes" style="font-size: 11px;">Yes</label>
                             </div>
-                        `).join('');
-                    }
-                    resultsDiv.style.display = 'block';
-                })
-                .catch(error => {
-                    console.error('Error searching customers:', error);
-                    resultsDiv.innerHTML = '<div class="search-result-item" style="color: #ef4444;">Error searching customers</div>';
-                });
-            }, 300);
+                            <div class="checkbox-group" style="display: inline-flex;">
+                                <input type="checkbox" id="psfNo">
+                                <label for="psfNo" style="font-size: 11px;">No</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 3px;">Remarks:</label>
+                        <textarea id="remarksField" style="width: 100%; height: 35px; border: 1px solid #999; font-size: 10px; padding: 3px; resize: none;"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Checklist Section -->
+            <div class="checklist-section">
+                <div class="checklist-column">
+                    <div class="section-title">Any Additional Voice</div>
+                    <textarea style="width: 100%; height: 100px; border: 1px solid #999; font-size: 11px; padding: 5px;"></textarea>
+                    <div style="margin-top: 10px; font-size: 11px;">
+                        <strong>Service Advisor Name:</strong>
+                        <input type="text" style="width: 100%; border: none; border-bottom: 1px solid #999; margin-top: 5px;">
+                    </div>
+                </div>
+
+                <div class="checklist-column">
+                    <div class="section-title">Final Service Remarks</div>
+                    <textarea style="width: 100%; height: 130px; border: 1px solid #999; font-size: 11px; padding: 5px;"></textarea>
+                </div>
+
+                <div class="checklist-column">
+                    <div class="section-title">Vehicle Checklist</div>
+                    <div style="margin-bottom: 8px; font-size: 10px; font-weight: bold;">Optional Parts:</div>
+                    <div class="checklist-items">
+                        <div class="checklist-item"><input type="checkbox"><label>1. Foot Rest Comp.</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>2. Fr. Inner Box</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>3. Side Stand</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>4. Spare Tyre Bracket</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>5. Side Protector</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>6. Front Guard (MC)</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>7. Others</label></div>
+                    </div>
+                    <div style="margin: 8px 0; font-size: 10px; font-weight: bold;">Frame:</div>
+                    <div class="checklist-items">
+                        <div class="checklist-item"><input type="checkbox"><label>1. All Rond Guard</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>2. Front Fender Guard</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>3. Front Crash Guard</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>4. Seat Cover</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>5. Grip Cover</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>6. Mud Flap</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>7. Buzzer</label></div>
+                    </div>
+                    <div style="margin: 8px 0; font-size: 10px; font-weight: bold;">Accessory List:</div>
+                    <div class="checklist-items">
+                        <div class="checklist-item"><input type="checkbox"><label>8. Front Basket</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>9. Rear Grip</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>10. Side Box</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>11. Luggage Net</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>12. Helmet Lock</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>13. Tyre Lock</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>14. Regn. No. Plate</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>15. Others</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>16. Others</label></div>
+                    </div>
+                </div>
+
+                <div class="checklist-column">
+                    <div class="section-title">Customer Request</div>
+                    <div style="margin-bottom: 8px; font-size: 10px; font-weight: bold;">Engine:</div>
+                    <div class="checklist-items">
+                        <div class="checklist-item"><input type="checkbox"><label>1. Foot Rest Comp.</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>2. Fr. Inner Box</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>3. Side Stand</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>4. Spare Tyre Bracket</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>5. Side Protector</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>6. Front Guard (MC)</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>7. Others</label></div>
+                    </div>
+                    <div style="margin: 8px 0; font-size: 10px; font-weight: bold;">Electrical:</div>
+                    <div class="checklist-items">
+                        <div class="checklist-item"><input type="checkbox"><label>5. Grip Cover</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>6. Mud Flap</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>7. Buzzer</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>8. Front Basket</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>9. Rear Grip</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>10. Side Box</label></div>
+                    </div>
+                    <div style="margin: 8px 0; font-size: 10px; font-weight: bold;">Regular/Custom Request:</div>
+                    <div class="checklist-items">
+                        <div class="checklist-item"><input type="checkbox"><label>11. Luggage Net</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>12. Helmet Lock</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>13. Tyre Lock</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>14. Regn. No. Plate</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>15. Others</label></div>
+                        <div class="checklist-item"><input type="checkbox"><label>16. Others</label></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Section -->
+            <div class="bottom-section">
+                <div class="advisor-tech-section">
+                    <div style="margin-bottom: 10px; font-size: 11px;">
+                        <strong>Test ride Taken at the time of Job Card Opening:</strong>
+                        <textarea style="width: 100%; height: 40px; border: 1px solid #999; font-size: 11px; padding: 5px; margin-top: 5px;"></textarea>
+                    </div>
+                    <div style="margin-bottom: 10px; font-size: 11px;">
+                        <strong>Technician Name:</strong>
+                        <input type="text" style="width: 100%; border: none; border-bottom: 1px solid #999; margin-top: 5px;">
+                    </div>
+                    <div style="margin-top: 15px; font-size: 11px; padding: 10px; border: 1px solid #999; min-height: 60px;">
+                        <p>I certify that the work has been done to my satisfaction and I have taken the delivery of my vehicle.</p>
+                    </div>
+                </div>
+
+                <div class="cost-payment-section">
+                    <div style="margin-bottom: 10px; font-size: 11px;">
+                        <strong>Test ride Taken at the time of Job Card Opening:</strong>
+                        <textarea style="width: 100%; height: 40px; border: 1px solid #999; font-size: 11px; padding: 5px; margin-top: 5px;"></textarea>
+                    </div>
+                    <div style="margin-bottom: 10px; font-size: 11px;">
+                        <strong>Estimated Cost Rs.</strong>
+                        <input type="number" id="estimatedCost" style="width: 100%; border: none; border-bottom: 1px solid #999; margin-top: 5px;">
+                    </div>
+                    <div style="margin-bottom: 10px; font-size: 11px;">
+                        <strong>Payment Details:</strong>
+                        <div style="margin-top: 8px;">
+                            <div class="checkbox-group" style="display: inline-flex; margin-right: 15px;">
+                                <input type="checkbox" id="paymentCash">
+                                <label for="paymentCash">Cash</label>
+                            </div>
+                            <div class="checkbox-group" style="display: inline-flex; margin-right: 15px;">
+                                <input type="checkbox" id="paymentCard">
+                                <label for="paymentCard">Card</label>
+                            </div>
+                            <div class="checkbox-group" style="display: inline-flex; margin-right: 15px;">
+                                <input type="checkbox" id="paymentCredit">
+                                <label for="paymentCredit">Credit</label>
+                            </div>
+                            <div class="checkbox-group" style="display: inline-flex;">
+                                <input type="checkbox" id="paymentWarranty">
+                                <label for="paymentWarranty">Warranty</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="font-size: 11px; margin-top: 15px;">
+                        <div class="form-row">
+                            <label>Invoice No.</label>
+                            <input type="text" id="invoiceNo">
+                        </div>
+                        <div class="form-row">
+                            <label>Amount Rs.</label>
+                            <input type="number" id="amountRs">
+                        </div>
+                        <div class="form-row">
+                            <label>Gate Pass No.</label>
+                            <input type="text" id="gatePassNo">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signature Section -->
+            <div class="signature-section">
+                <div class="signature-box">
+                    <div style="font-size: 11px; margin-bottom: 5px;">
+                        <strong>Date:</strong>
+                        <input type="date" style="border: none; border-bottom: 1px solid #999; margin-left: 10px;">
+                    </div>
+                    <div class="signature-line">Customer's Signature</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line">Cashier's Signature</div>
+                </div>
+            </div>
+
+            <!-- Gate Pass Section -->
+            <div class="gate-pass">
+                <div class="gate-pass-header">
+                    <div>
+                        <h2 style="font-size: 20px; font-weight: bold;">JYOTI AUTO PARTS</h2>
+                        <p style="font-size: 10px;">Near Hata Road Petrol Pump Se 200 Meter Aage, Purwa Chauraha, Deoria</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <strong style="font-size: 14px;">Customer's Copy/Gate Pass</strong>
+                    </div>
+                    <div style="text-align: right;">
+                        <strong style="font-size: 14px;">JOB CARD No.</strong>
+                        <span id="gatePassJobCardNo" style="font-size: 16px; margin-left: 10px;">512</span>
+                    </div>
+                </div>
+                <div style="font-size: 11px;">
+                    <p><strong>Workshop Timing:</strong> 09:30 am to 7:00 pm</p>
+                    <p><strong>Lunch:</strong> 2:00 pm to 2:30 pm</p>
+                    <p><strong>Weekly off:</strong> Saturday</p>
+                </div>
+                <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 11px;">
+                    <div>
+                        <div class="form-row">
+                            <label>Date:</label>
+                            <input type="text" readonly>
+                        </div>
+                        <div class="form-row">
+                            <label>Vehicle No:</label>
+                            <input type="text" readonly>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="form-row">
+                            <label>Estimated Delivery Time:</label>
+                            <input type="text" readonly>
+                        </div>
+                        <div class="form-row">
+                            <label>Estimated Cost Rs.:</label>
+                            <input type="text" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 11px;">
+                    <div class="form-row">
+                        <label>Service Advisor Name:</label>
+                        <input type="text" readonly>
+                    </div>
+                    <div class="signature-line" style="margin-top: 0; text-align: right;">Customer Signature</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Database simulation (in real app, this would be API calls)
+    let jobCards = [
+        {
+            jobCardNo: '512',
+            customerName: 'Rajesh Kumar',
+            vehicleNo: 'DL01AB1234',
+            inDateTime: '2024-11-15T10:30',
+            status: 'in-progress',
+            estimatedCost: 5500
+        }
+    ];
+
+    let currentJobCardNo = 513; // Auto-increment
+
+    // Initialize
+    function init() {
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        const timeStr = today.toTimeString().split(' ')[0].substring(0, 5);
+        
+        document.getElementById('inDate').value = dateStr;
+        document.getElementById('inTime').value = timeStr;
+    }
+
+    // Create new job card
+    function createNewJobCard() {
+        document.getElementById('jobCardNo').value = currentJobCardNo;
+        document.getElementById('gatePassJobCardNo').textContent = currentJobCardNo;
+        
+        // Reset form
+        document.getElementById('jobCardForm').querySelectorAll('input[type="text"], input[type="email"], input[type="number"], textarea').forEach(input => {
+            if (input.id !== 'jobCardNo' && !input.readOnly) {
+                input.value = '';
+            }
         });
+        
+        document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        
+        init();
+        openJobCardModal();
+    }
 
-        function selectCustomer(id, name, phone, vehicleNumber) {
-            document.getElementById('selectedCustomerId').value = id;
-            document.getElementById('customerSearch').value = name;
-            document.getElementById('selectedCustomerName').textContent = name;
-            document.getElementById('selectedCustomerDetails').textContent = `${phone || ''} ${vehicleNumber ? '• ' + vehicleNumber : ''}`;
-            document.getElementById('selectedCustomerInfo').style.display = 'block';
-            document.getElementById('customerSearchResults').style.display = 'none';
+    // View/Edit job card
+    function viewJobCard(jobCardNo) {
+        // Load job card data (would be from API in real app)
+        const jobCard = jobCards.find(jc => jc.jobCardNo == jobCardNo);
+        
+        if (jobCard) {
+            document.getElementById('jobCardNo').value = jobCard.jobCardNo;
+            document.getElementById('customerName').value = jobCard.customerName || '';
+            document.getElementById('registrationNo').value = jobCard.vehicleNo || '';
             
-            if (vehicleNumber) {
-                document.getElementById('vehicleNumber').value = vehicleNumber;
-            }
+            const [date, time] = jobCard.inDateTime.split('T');
+            document.getElementById('inDate').value = date;
+            document.getElementById('inTime').value = time;
+            
+            document.getElementById('estimatedCost').value = jobCard.estimatedCost || '';
         }
+        
+        openJobCardModal();
+    }
 
-        // Add/Remove tasks
-        function addTask() {
-            const tasksList = document.getElementById('tasksList');
-            const taskItem = document.createElement('div');
-            taskItem.className = 'task-item';
-            taskItem.innerHTML = `
-                <input type="text" class="task-input" placeholder="Enter task description">
-                <button class="btn btn-danger btn-small" onclick="removeTask(this)">Remove</button>
-            `;
-            tasksList.appendChild(taskItem);
-        }
+    // Print job card
+    function printJobCard(jobCardNo) {
+        viewJobCard(jobCardNo);
+        setTimeout(() => window.print(), 500);
+    }
 
-        function removeTask(btn) {
-            const tasksList = document.getElementById('tasksList');
-            if (tasksList.children.length > 1) {
-                btn.parentElement.remove();
-            } else {
-                showModal('Error', 'At least one task is required');
-            }
-        }
+    // Save job card
+    function saveJobCard() {
+        const jobCardData = {
+            jobCardNo: document.getElementById('jobCardNo').value,
+            vehicleTagNo: document.getElementById('vehicleTagNo').value,
+            inDate: document.getElementById('inDate').value,
+            inTime: document.getElementById('inTime').value,
+            expDeliveryDate: document.getElementById('expDeliveryDate').value,
+            expDeliveryTime: document.getElementById('expDeliveryTime').value,
+            customerName: document.getElementById('customerName').value,
+            customerAddress: document.getElementById('customerAddress').value,
+            customerPhone: document.getElementById('customerPhone').value,
+            customerEmail: document.getElementById('customerEmail').value,
+            vehicleModel: document.getElementById('vehicleModel').value,
+            vehicleType: document.getElementById('vehicleType').value,
+            registrationNo: document.getElementById('registrationNo').value,
+            frameNo: document.getElementById('frameNo').value,
+            engineNo: document.getElementById('engineNo').value,
+            colour: document.getElementById('colour').value,
+            kmsRun: document.getElementById('kmsRun').value,
+            estimatedCost: document.getElementById('estimatedCost').value,
+            // Add all other fields...
+        };
 
-        // Create job card
-        function createJobCard() {
-            const customerId = document.getElementById('selectedCustomerId').value;
-            const vehicleNumber = document.getElementById('vehicleNumber').value;
-            const assignee = document.getElementById('assignee').value;
-            const notes = document.getElementById('jobNotes').value;
+        console.log('Saving job card:', jobCardData);
+        
+        // In real app, make API call to save
+        // await fetch('/api/jobcards', { method: 'POST', body: JSON.stringify(jobCardData) });
+        
+        alert('Job Card saved successfully!');
+        closeJobCardModal();
+        // Refresh grid
+    }
 
-            const taskInputs = document.querySelectorAll('.task-input');
-            const tasks = Array.from(taskInputs)
-                .map(input => input.value.trim())
-                .filter(task => task.length > 0);
+    // Modal functions
+    function openJobCardModal() {
+        document.getElementById('jobCardModal').classList.add('active');
+    }
 
-            if (!customerId) {
-                showModal('Error', 'Please select a customer');
-                return;
-            }
+    function closeJobCardModal() {
+        document.getElementById('jobCardModal').classList.remove('active');
+    }
 
-            if (!vehicleNumber) {
-                showModal('Error', 'Please enter vehicle number');
-                return;
-            }
+    // Fuel level toggle
+    function toggleFuel(segment) {
+        segment.classList.toggle('filled');
+    }
 
-            if (tasks.length === 0) {
-                showModal('Error', 'Please add at least one task');
-                return;
-            }
-
-            // Show loading overlay
-            showLoadingOverlay('Creating job card...');
-
-            fetch(`${API_URL}/job-cards`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    customer_id: customerId,
-                    vehicle_number: vehicleNumber,
-                    tasks: tasks,
-                    assignee: assignee || null,
-                    notes: notes || null
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showModal('Error', data.error);
-                } else {
-                    showModal('Success', 'Job card created successfully!', function() {
-                        closeCreateJobCardModal();
-                        loadJobCards();
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error creating job card:', error);
-                showModal('Error', 'Failed to create job card');
-            })
-            .finally(() => {
-                hideLoadingOverlay();
-            });
-        }
-
-        // View job card details
-        function viewJobCard(id) {
-            currentJobCardId = id;
-
-            // Show loading overlay
-            showLoadingOverlay('Loading job card details...');
-
-            fetch(`${API_URL}/job-cards/${id}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            .then(response => response.json())
-            .then(job => {
-                currentJobCardData = job;
-                console.log('Viewing Job Card:', job.id, 'Status:', job.status);
-                console.log('Job status check - open:', job.status === 'open', 'closed:', job.status === 'closed', 'in_progress:', job.status === 'in_progress');
-                document.getElementById('jobCardTitle').textContent = job.job_number;
-                
-                const detailsHtml = `
-                    <div class="section">
-                        <h3>Job Information</h3>
-                        <div class="detail-grid">
-                            <div class="detail-item">
-                                <strong>Status</strong>
-                                <span class="status-badge ${job.status}">${job.status}</span>
-                            </div>
-                            <div class="detail-item">
-                                <strong>Customer</strong>
-                                <span>${job.customer_name}</span>
-                            </div>
-                            <div class="detail-item">
-                                <strong>Vehicle</strong>
-                                <span>${job.vehicle_number}</span>
-                            </div>
-                            <div class="detail-item">
-                                <strong>Assignee</strong>
-                                <span>${job.assignee || 'Not assigned'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <strong>Created</strong>
-                                <span>${new Date(job.created_at).toLocaleString()}</span>
-                            </div>
-                            ${job.closed_at ? `
-                                <div class="detail-item">
-                                    <strong>Closed</strong>
-                                    <span>${new Date(job.closed_at).toLocaleString()}</span>
-                                </div>
-                            ` : ''}
-                        </div>
-                        ${job.notes ? `
-                            <div class="detail-item" style="margin-top: 15px;">
-                                <strong>Notes</strong>
-                                <span>${job.notes}</span>
-                            </div>
-                        ` : ''}
-                    </div>
-
-                    <div class="section">
-                        <h3>Tasks</h3>
-                        <ul class="task-list-view">
-                            ${job.tasks.map(task => `
-                                <li>
-                                    <span>${task.task_description}</span>
-                                    <span class="status-badge ${task.status}">${task.status}</span>
-                                </li>
-                            `).join('')}
-                        </ul>
-                    </div>
-
-                    <div class="section">
-                        <h3>Stock Items Used</h3>
-                        ${job.stock_items.length > 0 ? `
-                            <table class="stock-items-table">
-                                <thead>
-                                    <tr>
-                                        <th>Product</th>
-                                        <th>Quantity</th>
-                                        <th>Unit Price</th>
-                                        <th>Total</th>
-                                        <th>Rack</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${job.stock_items.map(item => `
-                                        <tr>
-                                            <td>${item.product_name}</td>
-                                            <td>${item.quantity}</td>
-                                            <td>₹${item.unit_price.toFixed(2)}</td>
-                                            <td>₹${item.total_price.toFixed(2)}</td>
-                                            <td>${item.rack_id || '-'}</td>
-                                        </tr>
-                                    `).join('')}
-                                    <tr style="font-weight: bold; background: #f9fafb;">
-                                        <td colspan="3">Total</td>
-                                        <td>₹${job.stock_items.reduce((sum, item) => sum + item.total_price, 0).toFixed(2)}</td>
-                                        <td></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        ` : '<p style="color: #6b7280;">No stock items added yet</p>'}
-                        ${job.status === 'open' ? `
-                            <button class="btn btn-primary btn-small" style="margin-top: 15px;" onclick="openAddStockModal()">+ Add Stock Item</button>
-                        ` : ''}
-                    </div>
-
-                    ${job.status === 'closed' || job.labour_charge > 0 ? `
-                    <div class="section">
-                        <h3>Financial Summary</h3>
-                        <div class="detail-grid">
-                            <div class="detail-item">
-                                <strong>Stock Total</strong>
-                                <span>₹${job.stock_items.reduce((sum, item) => sum + item.total_price, 0).toFixed(2)}</span>
-                            </div>
-                            <div class="detail-item">
-                                <strong>Labour Charge</strong>
-                                <span>₹${(job.labour_charge || 0).toFixed(2)}</span>
-                            </div>
-                            ${job.discount > 0 ? `
-                            <div class="detail-item">
-                                <strong>Discount</strong>
-                                <span style="color: #ef4444;">-₹${job.discount.toFixed(2)}</span>
-                            </div>
-                            ` : ''}
-                            <div class="detail-item" style="background: #dbeafe; font-weight: bold;">
-                                <strong>Grand Total</strong>
-                                <span style="color: #1e40af; font-size: 18px;">₹${((job.stock_items.reduce((sum, item) => sum + item.total_price, 0) + (job.labour_charge || 0)) - (job.discount || 0)).toFixed(2)}</span>
-                            </div>
-                        </div>
-                    </div>
-                    ` : ''}
-
-                    <div class="action-buttons">
-                        <button class="btn btn-secondary" onclick="printJobCard()">🖨️ Print Job Card</button>
-                        ${job.status === 'open' || job.status === 'in_progress' ? `
-                            <button class="btn btn-success" onclick="completeJobCard()">Complete & Bill</button>
-                            <button class="btn btn-danger" onclick="rejectJobCard()">Reject Job Card</button>
-                        ` : ''}
-                        ${job.status === 'closed' ? `
-                            <button class="btn btn-primary" onclick="printBill()">📄 Download/Print Bill</button>
-                        ` : ''}
-                        <button class="btn btn-warning" onclick="editJobCard()">✏️ Edit Job Card</button>
-                    </div>
-                `;
-                
-                console.log('Generated HTML includes edit button:', detailsHtml.includes('editJobCard'));
-                console.log('Generated HTML includes print bill:', detailsHtml.includes('printBill'));
-                document.getElementById('jobCardDetails').innerHTML = detailsHtml;
-                document.getElementById('viewJobCardModal').classList.add('active');
-
-                // Load bills for this job card if it's closed
-                if (job.status === 'closed') {
-                    loadJobCardBills(id);
-                }
-            })
-            .catch(error => {
-                console.error('Error loading job card:', error);
-                showModal('Error', 'Failed to load job card details');
-            })
-            .finally(() => {
-                hideLoadingOverlay();
-            });
-        }
-
-        // Load products for stock selection
-        function loadProducts() {
-            // Show loading overlay
-            showLoadingOverlay('Loading products...');
-
-            fetch(`${API_URL}/products`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                const select = document.getElementById('stockProductId');
-                select.innerHTML = '<option value="">Select product...</option>' +
-                    data.map(product => `
-                        <option value="${product.id}" data-price="${product.sell_price}">
-                            ${product.name} - ₹${product.sell_price} ${product.rack_id ? '(' + product.rack_id + ')' : ''}
-                        </option>
-                    `).join('');
-
-                // Initialize Select2
-                $('#stockProductId').select2({
-                    placeholder: 'Search and select product...',
-                    allowClear: true,
-                    dropdownParent: $('#addStockModal'),
-                    width: '100%'
-                });
-
-                // Auto-fill price when product selected
-                $('#stockProductId').on('select2:select', function (e) {
-                    const selectedOption = e.params.data.element;
-                    const price = selectedOption.getAttribute('data-price');
-                    if (price) {
-                        document.getElementById('stockUnitPrice').value = price;
-                    }
-                });
-            })
-            .catch(error => {
-                console.error('Error loading products:', error);
-                showModal('Error', 'Failed to load products');
-            })
-            .finally(() => {
-                hideLoadingOverlay();
-            });
-        }
-
-        // Auto-fill price when product selected (fallback for non-Select2)
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('stockProductId').addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const price = selectedOption.getAttribute('data-price');
-                if (price) {
-                    document.getElementById('stockUnitPrice').value = price;
-                }
-            });
+    // Filter job cards
+    function filterJobCards() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const rows = document.querySelectorAll('#jobCardsBody tr');
+        
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(searchTerm) ? '' : 'none';
         });
+    }
 
-        // Add stock item
-        function addStockItem() {
-            const productId = document.getElementById('stockProductId').value;
-            const quantity = parseInt(document.getElementById('stockQuantity').value);
-            const unitPrice = parseFloat(document.getElementById('stockUnitPrice').value);
-            const notes = document.getElementById('stockNotes').value;
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', init);
+</script>
 
-            if (!productId || !quantity || !unitPrice) {
-                showModal('Error', 'Please fill all required fields');
-                return;
-            }
-
-            // Show loading overlay
-            showLoadingOverlay('Adding stock item...');
-
-            fetch(`${API_URL}/job-cards/${currentJobCardId}/stock-items`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    product_id: productId,
-                    quantity: quantity,
-                    unit_price: unitPrice,
-                    notes: notes || null
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showModal('Error', data.error);
-                } else {
-                    showModal('Success', 'Stock item added successfully!', function() {
-                        closeAddStockModal();
-                        viewJobCard(currentJobCardId);
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error adding stock item:', error);
-                showModal('Error', 'Failed to add stock item');
-            })
-            .finally(() => {
-                hideLoadingOverlay();
-            });
-        }
-
-        // Complete job card
-        function completeJobCard() {
-            document.getElementById('completeBillModal').classList.add('active');
-        }
-
-        // Submit complete and bill
-        function submitCompleteAndBill() {
-            const labourCharge = parseFloat(document.getElementById('labourCharge').value) || 0;
-            const discount = parseFloat(document.getElementById('billDiscount').value) || 0;
-            const lastServiceDate = document.getElementById('lastServiceDate').value || null;
-            const nextServiceDate = document.getElementById('nextServiceDate').value || null;
-
-            // Show loading overlay
-            showLoadingOverlay('Completing job card...');
-
-            fetch(`${API_URL}/job-cards/${currentJobCardId}/complete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    labour_charge: labourCharge,
-                    discount: discount,
-                    last_service_date: lastServiceDate,
-                    next_service_date: nextServiceDate
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showModal('Error', data.error);
-                } else {
-                    // Show success message with bill options
-                    const billInfo = data.bill;
-                    const message = `
-                        <div style="text-align: center;">
-                            <h3 style="color: #28a745; margin-bottom: 15px;">✓ Job Card Completed!</h3>
-                            <p style="margin-bottom: 10px;">Bill Generated: <strong>${billInfo.bill_number}</strong></p>
-                            <p style="margin-bottom: 10px;">Total: <strong>₹${billInfo.total.toFixed(2)}</strong></p>
-                            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
-                                <button class="btn btn-primary" onclick="viewBill('${billInfo.id}')" style="padding: 10px 20px;">
-                                    View Bill
-                                </button>
-                                <button class="btn btn-secondary" onclick="downloadBill('${billInfo.id}', '${billInfo.bill_number}')" style="padding: 10px 20px;">
-                                    Download
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    showModal('Success', message, function() {
-                        closeCompleteBillModal();
-                        closeViewJobCardModal();
-                        loadJobCards();
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error completing job card:', error);
-                showModal('Error', 'Failed to complete job card');
-            })
-            .finally(() => {
-                hideLoadingOverlay();
-            });
-        }
-
-        // Print Job Card
-        function printJobCard() {
-            if (!currentJobCardData) {
-                showModal('Error', 'No job card data loaded');
-                return;
-            }
-            
-            const job = currentJobCardData;
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Job Card - ${job.job_number}</title>
-                    <style>
-                        body {
-                            font-family: Arial, sans-serif;
-                            padding: 20px;
-                            max-width: 800px;
-                            margin: 0 auto;
-                        }
-                        .header {
-                            text-align: center;
-                            border-bottom: 2px solid #000;
-                            padding-bottom: 15px;
-                            margin-bottom: 20px;
-                        }
-                        .info-grid {
-                            display: grid;
-                            grid-template-columns: 1fr 1fr;
-                            gap: 15px;
-                            margin-bottom: 20px;
-                        }
-                        .info-item {
-                            padding: 10px;
-                            background: #f5f5f5;
-                            border-radius: 5px;
-                        }
-                        .info-item label {
-                            font-weight: bold;
-                            display: block;
-                            margin-bottom: 5px;
-                        }
-                        .tasks-section {
-                            margin: 20px 0;
-                        }
-                        .tasks-section h3 {
-                            margin-bottom: 10px;
-                        }
-                        .tasks-section ul {
-                            list-style: none;
-                            padding: 0;
-                        }
-                        .tasks-section li {
-                            padding: 10px;
-                            background: #f9f9f9;
-                            margin-bottom: 5px;
-                            border-left: 3px solid #667eea;
-                        }
-                        @media print {
-                            button { display: none; }
-                        }
-                        .print-btn {
-                            background: #667eea;
-                            color: white;
-                            padding: 10px 20px;
-                            border: none;
-                            border-radius: 5px;
-                            cursor: pointer;
-                            margin-bottom: 20px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <button class="print-btn" onclick="window.print()">🖨️ Print</button>
-                    
-                    <div class="header">
-                        <h1>JOB CARD</h1>
-                        <p>${job.job_number}</p>
-                    </div>
-
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <label>Customer:</label>
-                            <div>${job.customer_name}</div>
-                        </div>
-                        <div class="info-item">
-                            <label>Vehicle:</label>
-                            <div>${job.vehicle_number}</div>
-                        </div>
-                        <div class="info-item">
-                            <label>Status:</label>
-                            <div>${job.status.toUpperCase()}</div>
-                        </div>
-                        <div class="info-item">
-                            <label>Created:</label>
-                            <div>${new Date(job.created_at).toLocaleString()}</div>
-                        </div>
-                        ${job.assignee ? `
-                        <div class="info-item">
-                            <label>Assignee:</label>
-                            <div>${job.assignee}</div>
-                        </div>
-                        ` : ''}
-                    </div>
-
-                    <div class="tasks-section">
-                        <h3>Tasks:</h3>
-                        <ul>
-                            ${job.tasks.map(task => `<li>${task.task_description}</li>`).join('')}
-                        </ul>
-                    </div>
-
-                    ${job.notes ? `
-                    <div class="info-item">
-                        <label>Notes:</label>
-                        <div>${job.notes}</div>
-                    </div>
-                    ` : ''}
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-        }
-
-        // Print bill
-        function printBill() {
-            // Show loading overlay
-            showLoadingOverlay('Loading bill...');
-
-            // First, get the bills for this job card
-            fetch(`${API_URL}/job-cards/${currentJobCardId}/bills`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            .then(response => response.json())
-            .then(bills => {
-                hideLoadingOverlay();
-
-                if (!bills || bills.length === 0) {
-                    showModal('Error', 'No bill found for this job card');
-                    return;
-                }
-
-                // Get the most recent bill
-                const latestBill = bills[0];
-
-                // Open bill in new tab
-                viewBill(latestBill.id);
-            })
-            .catch(error => {
-                console.error('Error loading bill:', error);
-                showModal('Error', 'Failed to load bill');
-                hideLoadingOverlay();
-            });
-        }
-
-        // Old printBill function backup (using old /job-cards/:id/bill endpoint)
-        function printBillOld() {
-            // Show loading overlay
-            showLoadingOverlay('Generating bill...');
-
-            fetch(`${API_URL}/job-cards/${currentJobCardId}/bill`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            .then(response => response.json())
-            .then(bill => {
-                const printWindow = window.open('', '_blank');
-                printWindow.document.write(`
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>Bill - ${bill.job_number}</title>
-                        <style>
-                            body {
-                                font-family: Arial, sans-serif;
-                                padding: 20px;
-                                max-width: 800px;
-                                margin: 0 auto;
-                            }
-                            .header {
-                                text-align: center;
-                                border-bottom: 2px solid #000;
-                                padding-bottom: 15px;
-                                margin-bottom: 20px;
-                            }
-                            .header h1 {
-                                margin: 0;
-                                font-size: 28px;
-                            }
-                            .header p {
-                                margin: 5px 0;
-                            }
-                            .info-section {
-                                margin-bottom: 20px;
-                            }
-                            .info-grid {
-                                display: grid;
-                                grid-template-columns: 1fr 1fr;
-                                gap: 15px;
-                                margin-bottom: 20px;
-                            }
-                            .info-item {
-                                padding: 10px;
-                                background: #f5f5f5;
-                                border-radius: 5px;
-                            }
-                            .info-item label {
-                                font-weight: bold;
-                                display: block;
-                                margin-bottom: 5px;
-                                font-size: 12px;
-                                color: #666;
-                            }
-                            .info-item div {
-                                font-size: 14px;
-                            }
-                            table {
-                                width: 100%;
-                                border-collapse: collapse;
-                                margin: 20px 0;
-                            }
-                            th, td {
-                                padding: 12px;
-                                text-align: left;
-                                border-bottom: 1px solid #ddd;
-                            }
-                            th {
-                                background: #f5f5f5;
-                                font-weight: bold;
-                            }
-                            .total-row {
-                                font-weight: bold;
-                                background: #f9f9f9;
-                            }
-                            .grand-total {
-                                font-size: 18px;
-                                background: #e9e9e9;
-                            }
-                            .footer {
-                                margin-top: 40px;
-                                text-align: center;
-                                padding-top: 20px;
-                                border-top: 1px solid #ddd;
-                                color: #666;
-                                font-size: 12px;
-                            }
-                            @media print {
-                                button {
-                                    display: none;
-                                }
-                            }
-                            .print-btn {
-                                background: #667eea;
-                                color: white;
-                                padding: 10px 20px;
-                                border: none;
-                                border-radius: 5px;
-                                cursor: pointer;
-                                font-size: 14px;
-                                margin-bottom: 20px;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <button class="print-btn" onclick="window.print()">🖨️ Print</button>
-                        
-                        <div class="header">
-                            <h1>SERVICE BILL</h1>
-                            <p>Job Card: ${bill.job_number}</p>
-                        </div>
-
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <label>Customer Name</label>
-                                <div>${bill.customer_name}</div>
-                            </div>
-                            <div class="info-item">
-                                <label>Vehicle Number</label>
-                                <div>${bill.vehicle_number}</div>
-                            </div>
-                            <div class="info-item">
-                                <label>Phone</label>
-                                <div>${bill.customer_phone || 'N/A'}</div>
-                            </div>
-                            <div class="info-item">
-                                <label>Date</label>
-                                <div>${new Date(bill.created_at).toLocaleString()}</div>
-                            </div>
-                        </div>
-
-                        <div class="info-section">
-                            <h3>Services Performed:</h3>
-                            <ul>
-                                ${bill.tasks.map(task => `<li>${task.task_description}</li>`).join('')}
-                            </ul>
-                        </div>
-
-                        ${bill.stock_items.length > 0 ? `
-                            <h3>Parts & Materials:</h3>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th>Quantity</th>
-                                        <th>Unit Price</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${bill.stock_items.map(item => `
-                                        <tr>
-                                            <td>${item.product_name}</td>
-                                            <td>${item.quantity}</td>
-                                            <td>₹${item.unit_price.toFixed(2)}</td>
-                                            <td>₹${item.total_price.toFixed(2)}</td>
-                                        </tr>
-                                    `).join('')}
-                                    <tr class="total-row">
-                                        <td colspan="3" style="text-align: right;">Parts Total:</td>
-                                        <td>₹${bill.stock_total.toFixed(2)}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        ` : ''}
-
-                        <table>
-                            <tbody>
-                                <tr>
-                                    <td colspan="3" style="text-align: right;">Subtotal:</td>
-                                    <td>₹${bill.subtotal.toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="3" style="text-align: right;">Labour Charges:</td>
-                                    <td>₹${bill.labour_charge.toFixed(2)}</td>
-                                </tr>
-                                ${bill.discount > 0 ? `
-                                <tr>
-                                    <td colspan="3" style="text-align: right;">Discount:</td>
-                                    <td>-₹${bill.discount.toFixed(2)}</td>
-                                </tr>
-                                ` : ''}
-                                <tr class="grand-total">
-                                    <td colspan="3" style="text-align: right;">GRAND TOTAL:</td>
-                                    <td>₹${bill.grand_total.toFixed(2)}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-
-                        ${bill.notes ? `
-                            <div class="info-section">
-                                <h3>Notes:</h3>
-                                <p>${bill.notes}</p>
-                            </div>
-                        ` : ''}
-
-                        <div class="footer">
-                            <p>Thank you for your business!</p>
-                            <p>This is a computer-generated bill</p>
-                        </div>
-                    </body>
-                    </html>
-                `);
-                printWindow.document.close();
-            })
-            .catch(error => {
-                console.error('Error generating bill:', error);
-                showModal('Error', 'Failed to generate bill');
-            })
-            .finally(() => {
-                hideLoadingOverlay();
-            });
-        }
-
-        // Reject job card
-        function rejectJobCard() {
-            showInputModal('Reject Job Card', 'Enter reason for rejection:', function(reason) {
-                if (reason) {
-                    // Show loading overlay
-                    showLoadingOverlay('Rejecting job card...');
-
-                    fetch(`${API_URL}/job-cards/${currentJobCardId}/reject`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({ reason })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.error) {
-                            showModal('Error', data.error);
-                        } else {
-                            showModal('Success', 'Job card rejected', function() {
-                                closeViewJobCardModal();
-                                loadJobCards();
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error rejecting job card:', error);
-                        showModal('Error', 'Failed to reject job card');
-                    })
-                    .finally(() => {
-                        hideLoadingOverlay();
-                    });
-                }
-            });
-        }
-
-        // Edit Job Card
-        function editJobCard() {
-            // Show loading overlay
-            showLoadingOverlay('Loading job card data...');
-
-            // Load current job card data
-            fetch(`${API_URL}/job-cards/${currentJobCardId}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            .then(response => response.json())
-            .then(job => {
-                editJobCardData = job;
-
-                // Populate form fields
-                document.getElementById('editStatus').value = job.status;
-                document.getElementById('editAssignee').value = job.assignee || '';
-                document.getElementById('editLabourCharge').value = job.labour_charge || 0;
-                document.getElementById('editDiscount').value = job.discount || 0;
-                document.getElementById('editNotes').value = job.notes || '';
-                document.getElementById('editLastServiceDate').value = job.last_service_date ? job.last_service_date.split('T')[0] : '';
-                document.getElementById('editNextServiceDate').value = job.next_service_date ? job.next_service_date.split('T')[0] : '';
-
-                // Populate tasks
-                renderEditTasks(job.tasks);
-
-                // Show modal
-                document.getElementById('editJobCardModal').classList.add('active');
-            })
-            .catch(error => {
-                console.error('Error loading job card for edit:', error);
-                showModal('Error', 'Failed to load job card data');
-            })
-            .finally(() => {
-                hideLoadingOverlay();
-            });
-        }
-
-        function renderEditTasks(tasks) {
-            const tasksList = document.getElementById('editTasksList');
-            tasksList.innerHTML = tasks.map((task, index) => `
-                <div class="form-group" style="display: flex; gap: 10px; align-items: flex-start;">
-                    <textarea 
-                        id="editTask_${index}" 
-                        placeholder="Task description..." 
-                        style="flex: 1;"
-                    >${task.task_description || task}</textarea>
-                    <button class="btn btn-danger" onclick="removeEditTask(${index})" style="padding: 8px 12px;">×</button>
-                </div>
-            `).join('');
-        }
-
-        function addEditTask() {
-            const tasksList = document.getElementById('editTasksList');
-            const currentTasks = tasksList.querySelectorAll('textarea').length;
-            const newTaskHtml = `
-                <div class="form-group" style="display: flex; gap: 10px; align-items: flex-start;">
-                    <textarea 
-                        id="editTask_${currentTasks}" 
-                        placeholder="Task description..." 
-                        style="flex: 1;"
-                    ></textarea>
-                    <button class="btn btn-danger" onclick="removeEditTask(${currentTasks})" style="padding: 8px 12px;">×</button>
-                </div>
-            `;
-            tasksList.insertAdjacentHTML('beforeend', newTaskHtml);
-        }
-
-        function removeEditTask(index) {
-            const task = document.getElementById(`editTask_${index}`);
-            if (task && task.parentElement) {
-                task.parentElement.remove();
-            }
-        }
-
-        function submitEditJobCard() {
-            // Gather task data
-            const tasks = [];
-            const taskElements = document.querySelectorAll('#editTasksList textarea');
-            taskElements.forEach(textarea => {
-                if (textarea.value.trim()) {
-                    tasks.push(textarea.value.trim());
-                }
-            });
-
-            if (tasks.length === 0) {
-                showModal('Error', 'At least one task is required');
-                return;
-            }
-
-            const updateData = {
-                status: document.getElementById('editStatus').value,
-                assignee: document.getElementById('editAssignee').value,
-                labour_charge: parseFloat(document.getElementById('editLabourCharge').value) || 0,
-                discount: parseFloat(document.getElementById('editDiscount').value) || 0,
-                notes: document.getElementById('editNotes').value,
-                last_service_date: document.getElementById('editLastServiceDate').value || null,
-                next_service_date: document.getElementById('editNextServiceDate').value || null,
-                tasks: tasks
-            };
-
-            // Show loading overlay
-            showLoadingOverlay('Updating job card...');
-
-            fetch(`${API_URL}/job-cards/${currentJobCardId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(updateData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showModal('Error', data.error);
-                } else {
-                    showModal('Success', 'Job card updated successfully', function() {
-                        closeEditJobCardModal();
-                        closeViewJobCardModal();
-                        loadJobCards();
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error updating job card:', error);
-                showModal('Error', 'Failed to update job card');
-            })
-            .finally(() => {
-                hideLoadingOverlay();
-            });
-        }
-
-        function closeEditJobCardModal() {
-            document.getElementById('editJobCardModal').classList.remove('active');
-            editJobCardData = null;
-        }
-
-        // Simple modal helper functions
-        let messageModalCallback = null;
-
-        function showModal(title, message, callback) {
-            document.getElementById('messageModalTitle').textContent = title;
-            document.getElementById('messageModalText').textContent = message;
-            messageModalCallback = callback;
-            document.getElementById('messageModal').classList.add('active');
-        }
-
-        function closeMessageModal() {
-            document.getElementById('messageModal').classList.remove('active');
-            if (messageModalCallback) {
-                messageModalCallback();
-                messageModalCallback = null;
-            }
-        }
-
-        function showInputModal(title, message, callback) {
-            const input = prompt(message);
-            if (input) {
-                callback(input);
-            }
-        }
-
-        // Modal functions
-        function openCreateJobCardModal() {
-            document.getElementById('createJobCardModal').classList.add('active');
-        }
-
-        function closeCreateJobCardModal() {
-            document.getElementById('createJobCardModal').classList.remove('active');
-            document.getElementById('customerSearch').value = '';
-            document.getElementById('selectedCustomerId').value = '';
-            document.getElementById('vehicleNumber').value = '';
-            document.getElementById('assignee').value = '';
-            document.getElementById('jobNotes').value = '';
-            document.getElementById('selectedCustomerInfo').style.display = 'none';
-            
-            const tasksList = document.getElementById('tasksList');
-            tasksList.innerHTML = `
-                <div class="task-item">
-                    <input type="text" class="task-input" placeholder="e.g., Change engine oil">
-                    <button class="btn btn-danger btn-small" onclick="removeTask(this)">Remove</button>
-                </div>
-            `;
-        }
-
-        function closeViewJobCardModal() {
-            document.getElementById('viewJobCardModal').classList.remove('active');
-            currentJobCardId = null;
-        }
-
-        function openAddStockModal() {
-            loadProducts();
-            document.getElementById('addStockModal').classList.add('active');
-        }
-
-        function closeAddStockModal() {
-            document.getElementById('addStockModal').classList.remove('active');
-            $('#stockProductId').val(null).trigger('change'); // Clear Select2
-            document.getElementById('stockQuantity').value = '1';
-            document.getElementById('stockUnitPrice').value = '';
-            document.getElementById('stockNotes').value = '';
-        }
-
-        function closeCompleteBillModal() {
-            document.getElementById('completeBillModal').classList.remove('active');
-            document.getElementById('labourCharge').value = '0';
-            document.getElementById('billDiscount').value = '0';
-            document.getElementById('lastServiceDate').value = '';
-            document.getElementById('nextServiceDate').value = '';
-        }
-
-        // Event listeners
-        document.getElementById('searchInput').addEventListener('input', loadJobCards);
-        document.getElementById('statusFilter').addEventListener('change', loadJobCards);
-
-        // Close modals when clicking outside
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.classList.remove('active');
-            }
-        }
-
-        // Initial load
-        loadJobCards();
-
-        // ==================== BILL FUNCTIONS ====================
-
-        // View bill in new tab
-        function viewBill(billId) {
-            const url = `${API_URL}/bills/${billId}/view?token=${encodeURIComponent(token)}`;
-            const newWindow = window.open(url, '_blank');
-            if (newWindow) {
-                newWindow.opener = null; // Security: prevent access to opener
-            } else {
-                showModal('Error', 'Please allow popups to view the bill');
-            }
-        }
-
-        // Download bill (currently opens as HTML, user can print to PDF)
-        function downloadBill(billId, billNumber) {
-            const url = `${API_URL}/bills/${billId}/view?token=${encodeURIComponent(token)}`;
-            const newWindow = window.open(url, '_blank');
-            if (newWindow) {
-                newWindow.opener = null;
-                // Show instructions
-                showModal('Info', 'Bill opened in new tab. Use your browser\'s "Print" or "Save as PDF" option to download.');
-            } else {
-                showModal('Error', 'Please allow popups to download the bill');
-            }
-        }
-
-        // Get bills for a job card (to be used in job card view modal)
-        function loadJobCardBills(jobCardId) {
-            fetch(`${API_URL}/job-cards/${jobCardId}/bills`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
-            .then(response => response.json())
-            .then(bills => {
-                displayJobCardBills(bills);
-            })
-            .catch(error => {
-                console.error('Error loading bills:', error);
-            });
-        }
-
-        function displayJobCardBills(bills) {
-            if (!bills || bills.length === 0) {
-                return;
-            }
-
-            // Find or create bills section in job card modal
-            const billsSection = document.createElement('div');
-            billsSection.style.marginTop = '20px';
-            billsSection.style.borderTop = '2px solid #ddd';
-            billsSection.style.paddingTop = '15px';
-            billsSection.innerHTML = `
-                <h3 style="margin-bottom: 10px; color: #333;">Bills History</h3>
-                <table class="table" style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background: #f4f4f4;">
-                            <th style="padding: 8px; text-align: left;">Bill Number</th>
-                            <th style="padding: 8px; text-align: left;">Date</th>
-                            <th style="padding: 8px; text-align: right;">Total</th>
-                            <th style="padding: 8px; text-align: center;">Status</th>
-                            <th style="padding: 8px; text-align: center;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${bills.map(bill => `
-                            <tr style="border-bottom: 1px solid #ddd;">
-                                <td style="padding: 8px;">${bill.bill_number}</td>
-                                <td style="padding: 8px;">${new Date(bill.bill_date).toLocaleDateString('en-IN')}</td>
-                                <td style="padding: 8px; text-align: right;">₹${bill.total.toFixed(2)}</td>
-                                <td style="padding: 8px; text-align: center;">
-                                    <span class="badge ${bill.payment_status === 'paid' ? 'badge-success' : 'badge-warning'}" style="padding: 4px 8px; border-radius: 3px; font-size: 12px;">
-                                        ${bill.payment_status.toUpperCase()}
-                                    </span>
-                                </td>
-                                <td style="padding: 8px; text-align: center;">
-                                    <button class="btn btn-sm btn-primary" onclick="viewBill('${bill.id}')" style="padding: 4px 8px; font-size: 12px; margin-right: 5px;">
-                                        View
-                                    </button>
-                                    <button class="btn btn-sm btn-secondary" onclick="downloadBill('${bill.id}', '${bill.bill_number}')" style="padding: 4px 8px; font-size: 12px;">
-                                        Download
-                                    </button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-
-            // Append to job card details section
-            const detailsSection = document.getElementById('jobCardDetails');
-            if (detailsSection) {
-                // Remove existing bills section if any
-                const existingBills = detailsSection.querySelector('.bills-history-section');
-                if (existingBills) {
-                    existingBills.remove();
-                }
-                billsSection.classList.add('bills-history-section');
-                detailsSection.appendChild(billsSection);
-            }
-        }
-    </script>
 </body>
 </html>
