@@ -658,10 +658,20 @@ const API_URL = window.location.hostname === 'localhost'
                               })}
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex gap-2 items-center">
                             <span className={`px-2 py-1 text-xs rounded ${s.status === 'closed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
                               {s.status}
                             </span>
+                            <button
+                              onClick={() => {
+                                setViewJobCardId(s.id);
+                                setShowViewJobCardModal(true);
+                              }}
+                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                              title="View/Print Job Card"
+                            >
+                              View Job Card
+                            </button>
                           </div>
                         </div>
 
@@ -3524,20 +3534,31 @@ const API_URL = window.location.hostname === 'localhost'
       });
 
       const isViewMode = mode === 'view';
+      const [hasLoadedData, setHasLoadedData] = useState(false);
 
       // Load job card data when modal opens
       useEffect(() => {
-        if (isOpen && jobCardId) {
+        if (!isOpen) {
+          setHasLoadedData(false);
+          return;
+        }
+
+        if (hasLoadedData) return;
+
+        if (jobCardId) {
           loadJobCardData();
-        } else if (isOpen && Object.keys(prefilledData).length > 0) {
+          setHasLoadedData(true);
+        } else if (Object.keys(prefilledData).length > 0) {
           setFormData(prev => ({ ...prev, ...prefilledData }));
           if (!prefilledData.job_number) {
             setFormData(prev => ({ ...prev, job_number: 'AUTO' }));
           }
-        } else if (isOpen && !jobCardId) {
+          setHasLoadedData(true);
+        } else {
           setFormData(prev => ({ ...prev, job_number: 'AUTO' }));
+          setHasLoadedData(true);
         }
-      }, [isOpen, jobCardId, prefilledData]);
+      }, [isOpen, jobCardId, hasLoadedData]);
 
       const loadJobCardData = async () => {
         setLoading(true);
@@ -3741,7 +3762,7 @@ const API_URL = window.location.hostname === 'localhost'
       return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50">
           <div className="min-h-screen px-4 py-6">
-            <div className="bg-white rounded-lg shadow-2xl max-w-6xl mx-auto relative">
+            <div className="job-card-modal-container bg-white rounded-lg shadow-2xl max-w-6xl mx-auto relative">
               {/* Close button */}
               <button
                 onClick={onClose}
@@ -4023,14 +4044,54 @@ const API_URL = window.location.hostname === 'localhost'
 
           <style>{`
             @media print {
+              /* Hide everything */
+              body * {
+                visibility: hidden;
+              }
               .no-print {
                 display: none !important;
               }
-              body {
-                background: white;
+              /* Show only the job card modal and its children */
+              .job-card-modal-container,
+              .job-card-modal-container * {
+                visibility: visible;
               }
-              .fixed {
-                position: relative;
+              .job-card-modal-container {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                background: white !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                max-width: 100% !important;
+                padding: 10px !important;
+                margin: 0 !important;
+              }
+              body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              /* Fix overflow issues */
+              input, textarea {
+                border: none !important;
+                border-bottom: 1px solid #000 !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+              }
+              .border-2 {
+                border-width: 1px !important;
+              }
+              /* Ensure proper sizing */
+              .text-xs {
+                font-size: 10px !important;
+              }
+              .text-sm {
+                font-size: 11px !important;
+              }
+              .text-base {
+                font-size: 12px !important;
               }
             }
           `}</style>
@@ -4637,18 +4698,6 @@ const API_URL = window.location.hostname === 'localhost'
                 />
               </div>
             </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => {
-                  setComprehensiveJobCardId(null);
-                  setComprehensiveModalMode('edit');
-                  setShowComprehensiveModal(true);
-                }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                + Create Job Card
-              </button>
-            </div>
           </div>
 
           <SectionLoader loading={loadingJobCards} message="Loading job cards...">
@@ -4656,7 +4705,7 @@ const API_URL = window.location.hostname === 'localhost'
               <div className="text-center py-20 text-gray-500">
                 <div className="text-6xl mb-4">📋</div>
                 <h3 className="text-xl font-semibold mb-2">No job cards found</h3>
-                <p>Create your first job card to get started</p>
+                <p>Go to Customers page to create a new job card</p>
               </div>
             ) : (
               <>
