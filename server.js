@@ -334,9 +334,96 @@ function initializeDatabase() {
           )`, (err) => {
             if (err) console.error('Error creating call_logs table:', err);
             else console.log('✅ call_logs table created/verified');
+
+            // Run migrations for job_cards table (add new fields if they don't exist)
+            runJobCardMigrations();
           });
       }
     });
+  });
+}
+
+// Migration function to add new job card fields
+function runJobCardMigrations() {
+  const newColumns = [
+    { name: 'vehicle_tag_no', type: 'TEXT' },
+    { name: 'in_date', type: 'DATE' },
+    { name: 'in_time', type: 'TIME' },
+    { name: 'exp_delivery_date', type: 'DATE' },
+    { name: 'exp_delivery_time', type: 'TIME' },
+    { name: 'out_date', type: 'DATE' },
+    { name: 'out_time', type: 'TIME' },
+    { name: 'priority_booked_vehicle', type: 'INTEGER DEFAULT 0' },
+    { name: 'priority_customer_waiting', type: 'INTEGER DEFAULT 0' },
+    { name: 'priority_repeat_job', type: 'INTEGER DEFAULT 0' },
+    { name: 'customer_name', type: 'TEXT' },
+    { name: 'customer_address', type: 'TEXT' },
+    { name: 'customer_phone', type: 'TEXT' },
+    { name: 'customer_email', type: 'TEXT' },
+    { name: 'vehicle_model', type: 'TEXT' },
+    { name: 'vehicle_type', type: 'TEXT' },
+    { name: 'frame_no', type: 'TEXT' },
+    { name: 'engine_no', type: 'TEXT' },
+    { name: 'colour', type: 'TEXT' },
+    { name: 'registration_no', type: 'TEXT' },
+    { name: 'kms_run', type: 'INTEGER' },
+    { name: 'service_type_paid', type: 'INTEGER DEFAULT 0' },
+    { name: 'service_type_paid_no', type: 'TEXT' },
+    { name: 'service_type_general', type: 'INTEGER DEFAULT 0' },
+    { name: 'service_type_amc', type: 'INTEGER DEFAULT 0' },
+    { name: 'service_type_accidental', type: 'INTEGER DEFAULT 0' },
+    { name: 'service_type_complaint', type: 'INTEGER DEFAULT 0' },
+    { name: 'fuel_level', type: 'INTEGER DEFAULT 0' },
+    { name: 'psf_done_yes', type: 'INTEGER DEFAULT 0' },
+    { name: 'psf_done_no', type: 'INTEGER DEFAULT 0' },
+    { name: 'remarks', type: 'TEXT' },
+    { name: 'additional_voice', type: 'TEXT' },
+    { name: 'final_service_remarks', type: 'TEXT' },
+    { name: 'vehicle_checklist', type: 'TEXT' },
+    { name: 'customer_request', type: 'TEXT' },
+    { name: 'service_advisor_name', type: 'TEXT' },
+    { name: 'technician_name', type: 'TEXT' },
+    { name: 'test_ride_opening', type: 'TEXT' },
+    { name: 'test_ride_closing', type: 'TEXT' },
+    { name: 'estimated_cost', type: 'REAL DEFAULT 0' },
+    { name: 'payment_cash', type: 'INTEGER DEFAULT 0' },
+    { name: 'payment_card', type: 'INTEGER DEFAULT 0' },
+    { name: 'payment_credit', type: 'INTEGER DEFAULT 0' },
+    { name: 'payment_warranty', type: 'INTEGER DEFAULT 0' },
+    { name: 'invoice_no', type: 'TEXT' },
+    { name: 'amount_rs', type: 'REAL DEFAULT 0' },
+    { name: 'gate_pass_no', type: 'TEXT' },
+    { name: 'customer_signature_date', type: 'DATE' }
+  ];
+
+  // Check if columns exist and add them if they don't
+  db.all("PRAGMA table_info(job_cards)", (err, columns) => {
+    if (err) {
+      console.error('Error checking job_cards columns:', err);
+      return;
+    }
+
+    const existingColumns = columns.map(col => col.name);
+    let migrationsRun = 0;
+
+    newColumns.forEach(({ name, type }) => {
+      if (!existingColumns.includes(name)) {
+        db.run(`ALTER TABLE job_cards ADD COLUMN ${name} ${type}`, (err) => {
+          if (err) {
+            console.error(`Error adding column ${name}:`, err);
+          } else {
+            migrationsRun++;
+            console.log(`✅ Added column: ${name}`);
+          }
+        });
+      }
+    });
+
+    if (migrationsRun === 0) {
+      console.log('✅ Job cards table is up to date');
+    } else {
+      console.log(`✅ Ran ${migrationsRun} migrations for job_cards table`);
+    }
   });
 }
 
@@ -1382,10 +1469,25 @@ app.get('/api/job-cards/search-customer', authenticateToken, (req, res) => {
 
 // Create new job card
 app.post('/api/job-cards', authenticateToken, (req, res) => {
-  const { customer_id, vehicle_number, tasks, assignee, notes } = req.body;
+  const {
+    customer_id, vehicle_number, tasks, assignee, notes,
+    // New fields from updated job card format
+    vehicle_tag_no, in_date, in_time, exp_delivery_date, exp_delivery_time,
+    out_date, out_time, priority_booked_vehicle, priority_customer_waiting,
+    priority_repeat_job, customer_name, customer_address, customer_phone,
+    customer_email, vehicle_model, vehicle_type, frame_no, engine_no,
+    colour, registration_no, kms_run, service_type_paid, service_type_paid_no,
+    service_type_general, service_type_amc, service_type_accidental,
+    service_type_complaint, fuel_level, psf_done_yes, psf_done_no,
+    remarks, additional_voice, final_service_remarks, vehicle_checklist,
+    customer_request, service_advisor_name, technician_name, test_ride_opening,
+    test_ride_closing, estimated_cost, payment_cash, payment_card,
+    payment_credit, payment_warranty, invoice_no, amount_rs, gate_pass_no,
+    customer_signature_date
+  } = req.body;
 
-  if (!customer_id || !vehicle_number || !tasks || tasks.length === 0) {
-    return res.status(400).json({ error: 'Customer, vehicle number, and at least one task required' });
+  if (!customer_id || !vehicle_number) {
+    return res.status(400).json({ error: 'Customer and vehicle number required' });
   }
 
   // Check if there's already an open job card for this vehicle
@@ -1412,35 +1514,65 @@ app.post('/api/job-cards', authenticateToken, (req, res) => {
     const createdBy = req.user.username;
 
     db.serialize(() => {
-      // Insert job card
+      // Insert job card with all new fields
       db.run(`
-        INSERT INTO job_cards (id, customer_id, vehicle_number, job_number, assignee, notes, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [jobCardId, customer_id, vehicle_number, jobNumber, assignee || null, notes || null, createdBy], function(err) {
+        INSERT INTO job_cards (
+          id, customer_id, vehicle_number, job_number, assignee, notes, created_by,
+          vehicle_tag_no, in_date, in_time, exp_delivery_date, exp_delivery_time,
+          out_date, out_time, priority_booked_vehicle, priority_customer_waiting,
+          priority_repeat_job, customer_name, customer_address, customer_phone,
+          customer_email, vehicle_model, vehicle_type, frame_no, engine_no,
+          colour, registration_no, kms_run, service_type_paid, service_type_paid_no,
+          service_type_general, service_type_amc, service_type_accidental,
+          service_type_complaint, fuel_level, psf_done_yes, psf_done_no,
+          remarks, additional_voice, final_service_remarks, vehicle_checklist,
+          customer_request, service_advisor_name, technician_name, test_ride_opening,
+          test_ride_closing, estimated_cost, payment_cash, payment_card,
+          payment_credit, payment_warranty, invoice_no, amount_rs, gate_pass_no,
+          customer_signature_date
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        jobCardId, customer_id, vehicle_number, jobNumber, assignee || null, notes || null, createdBy,
+        vehicle_tag_no || null, in_date || null, in_time || null, exp_delivery_date || null, exp_delivery_time || null,
+        out_date || null, out_time || null, priority_booked_vehicle || 0, priority_customer_waiting || 0,
+        priority_repeat_job || 0, customer_name || null, customer_address || null, customer_phone || null,
+        customer_email || null, vehicle_model || null, vehicle_type || null, frame_no || null, engine_no || null,
+        colour || null, registration_no || null, kms_run || null, service_type_paid || 0, service_type_paid_no || null,
+        service_type_general || 0, service_type_amc || 0, service_type_accidental || 0,
+        service_type_complaint || 0, fuel_level || 0, psf_done_yes || 0, psf_done_no || 0,
+        remarks || null, additional_voice || null, final_service_remarks || null, vehicle_checklist || null,
+        customer_request || null, service_advisor_name || null, technician_name || null, test_ride_opening || null,
+        test_ride_closing || null, estimated_cost || 0, payment_cash || 0, payment_card || 0,
+        payment_credit || 0, payment_warranty || 0, invoice_no || null, amount_rs || 0, gate_pass_no || null,
+        customer_signature_date || null
+      ], function(err) {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
 
-      // Insert tasks
-      const taskStmt = db.prepare(`
-        INSERT INTO job_card_tasks (id, job_card_id, task_description)
-        VALUES (?, ?, ?)
-      `);
+      // Insert tasks if provided
+      if (tasks && tasks.length > 0) {
+        const taskStmt = db.prepare(`
+          INSERT INTO job_card_tasks (id, job_card_id, task_description)
+          VALUES (?, ?, ?)
+        `);
 
-      tasks.forEach(task => {
-        taskStmt.run(uuidv4(), jobCardId, task);
-      });
-
-      taskStmt.finalize((err) => {
-        if (err) {
-          return res.status(500).json({ error: err.message });
-        }
-
-        res.json({
-          id: jobCardId,
-          job_number: jobNumber,
-          message: 'Job card created successfully'
+        tasks.forEach(task => {
+          taskStmt.run(uuidv4(), jobCardId, task);
         });
+
+        taskStmt.finalize((err) => {
+          if (err) {
+            console.error('Error creating tasks:', err);
+          }
+        });
+      }
+
+      res.json({
+        id: jobCardId,
+        job_number: jobNumber,
+        message: 'Job card created successfully'
       });
     });
     });
@@ -1539,41 +1671,49 @@ app.get('/api/job-cards/:id', authenticateToken, (req, res) => {
   });
 });
 
-// Update job card (assignee, notes, status)
+// Update job card (all fields supported)
 app.put('/api/job-cards/:id', authenticateToken, (req, res) => {
   const jobCardId = req.params.id;
-  const { assignee, notes, status } = req.body;
-  
+  const allowedFields = [
+    'assignee', 'notes', 'status', 'labour_charge',
+    'vehicle_tag_no', 'in_date', 'in_time', 'exp_delivery_date', 'exp_delivery_time',
+    'out_date', 'out_time', 'priority_booked_vehicle', 'priority_customer_waiting',
+    'priority_repeat_job', 'customer_name', 'customer_address', 'customer_phone',
+    'customer_email', 'vehicle_model', 'vehicle_type', 'frame_no', 'engine_no',
+    'colour', 'registration_no', 'kms_run', 'service_type_paid', 'service_type_paid_no',
+    'service_type_general', 'service_type_amc', 'service_type_accidental',
+    'service_type_complaint', 'fuel_level', 'psf_done_yes', 'psf_done_no',
+    'remarks', 'additional_voice', 'final_service_remarks', 'vehicle_checklist',
+    'customer_request', 'service_advisor_name', 'technician_name', 'test_ride_opening',
+    'test_ride_closing', 'estimated_cost', 'payment_cash', 'payment_card',
+    'payment_credit', 'payment_warranty', 'invoice_no', 'amount_rs', 'gate_pass_no',
+    'customer_signature_date'
+  ];
+
   let query = 'UPDATE job_cards SET ';
   const params = [];
   const updates = [];
-  
-  if (assignee !== undefined) {
-    updates.push('assignee = ?');
-    params.push(assignee);
-  }
-  
-  if (notes !== undefined) {
-    updates.push('notes = ?');
-    params.push(notes);
-  }
-  
-  if (status !== undefined) {
-    updates.push('status = ?');
-    params.push(status);
-    
-    if (status === 'closed') {
-      updates.push('closed_at = CURRENT_TIMESTAMP');
+
+  // Dynamically build update query for all allowed fields
+  for (const field of allowedFields) {
+    if (req.body[field] !== undefined) {
+      updates.push(`${field} = ?`);
+      params.push(req.body[field]);
     }
   }
-  
+
+  // Special handling for status changes
+  if (req.body.status !== undefined && req.body.status === 'closed') {
+    updates.push('closed_at = CURRENT_TIMESTAMP');
+  }
+
   if (updates.length === 0) {
     return res.status(400).json({ error: 'No fields to update' });
   }
-  
+
   query += updates.join(', ') + ' WHERE id = ?';
   params.push(jobCardId);
-  
+
   db.run(query, params, function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
@@ -1922,9 +2062,9 @@ app.post('/api/job-cards/:id/complete', authenticateToken, (req, res) => {
 app.post('/api/job-cards/:id/reject', authenticateToken, (req, res) => {
   const jobCardId = req.params.id;
   const { reason } = req.body;
-  
+
   db.run(`
-    UPDATE job_cards 
+    UPDATE job_cards
     SET status = 'rejected', closed_at = CURRENT_TIMESTAMP, notes = COALESCE(notes || '\n', '') || 'Rejection Reason: ' || ?
     WHERE id = ?
   `, [reason || 'No reason provided', jobCardId], function(err) {
@@ -1935,6 +2075,230 @@ app.post('/api/job-cards/:id/reject', authenticateToken, (req, res) => {
       return res.status(404).json({ error: 'Job card not found' });
     }
     res.json({ message: 'Job card rejected successfully' });
+  });
+});
+
+// View/Print job card as HTML (for browser display and printing)
+app.get('/api/job-cards/:id/view', authenticateTokenFlexible, (req, res) => {
+  const jobCardId = req.params.id;
+
+  db.get(`
+    SELECT jc.*, c.name as customer_name_ref, c.phone as customer_phone_ref,
+           c.email as customer_email_ref, c.address as customer_address_ref
+    FROM job_cards jc
+    LEFT JOIN customers c ON jc.customer_id = c.id
+    WHERE jc.id = ?
+  `, [jobCardId], (err, jobCard) => {
+    if (err) {
+      return res.status(500).send(`<h1>Error</h1><p>${err.message}</p>`);
+    }
+    if (!jobCard) {
+      return res.status(404).send('<h1>Job Card Not Found</h1>');
+    }
+
+    // Get tasks and stock items
+    db.all('SELECT * FROM job_card_tasks WHERE job_card_id = ? ORDER BY created_at', [jobCardId], (err, tasks) => {
+      if (err) {
+        console.error('Error fetching tasks:', err);
+      }
+
+      db.all(`
+        SELECT jcs.*, p.name as product_name
+        FROM job_card_stock_items jcs
+        LEFT JOIN products p ON jcs.product_id = p.id
+        WHERE jcs.job_card_id = ?
+        ORDER BY jcs.created_at
+      `, [jobCardId], (err, stockItems) => {
+        if (err) {
+          console.error('Error fetching stock items:', err);
+        }
+
+        // Use customer info from job card first, fallback to customer table
+        const customerName = jobCard.customer_name || jobCard.customer_name_ref || '';
+        const customerPhone = jobCard.customer_phone || jobCard.customer_phone_ref || '';
+        const customerEmail = jobCard.customer_email || jobCard.customer_email_ref || '';
+        const customerAddress = jobCard.customer_address || jobCard.customer_address_ref || '';
+
+        // Generate the HTML for viewing/printing
+        const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Card - ${jobCard.job_number}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .job-card { max-width: 1200px; margin: 0 auto; background: white; padding: 40px; }
+        .job-card-header { border: 2px solid #000; padding: 15px; margin-bottom: 0; }
+        .job-card-header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .company-info h2 { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+        .company-info p { font-size: 11px; margin: 2px 0; }
+        .job-card-title { text-align: center; font-size: 18px; font-weight: bold; background: #f0f0f0; padding: 8px; margin: 10px -15px; }
+        .header-fields { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; font-size: 12px; }
+        .field-group { display: flex; align-items: center; }
+        .field-group label { font-weight: bold; margin-right: 8px; white-space: nowrap; }
+        .field-group .value { border-bottom: 1px solid #000; padding: 2px 5px; flex: 1; }
+        .priority-section { display: flex; gap: 15px; margin: 10px 0; font-size: 12px; }
+        .details-section { border: 2px solid #000; border-top: none; display: grid; grid-template-columns: 1fr 1fr; }
+        .customer-details { border-right: 2px solid #000; padding: 10px; }
+        .vehicle-details { padding: 10px; }
+        .section-title { background: #f0f0f0; padding: 5px; font-weight: bold; font-size: 13px; margin: -10px -10px 10px -10px; text-align: center; }
+        .form-row { display: flex; margin-bottom: 8px; font-size: 12px; }
+        .form-row label { width: 120px; font-weight: bold; }
+        .form-row .value { flex: 1; border-bottom: 1px solid #999; padding: 2px 5px; }
+        .print-actions { text-align: center; margin-bottom: 20px; }
+        .print-actions button { padding: 10px 20px; margin: 0 10px; font-size: 14px; cursor: pointer; }
+        @media print {
+          .print-actions { display: none; }
+          body { background: white; padding: 0; }
+          .job-card { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-actions">
+        <button onclick="window.print()">Print Job Card</button>
+        <button onclick="window.close()">Close</button>
+    </div>
+
+    <div class="job-card">
+        <div class="job-card-header">
+            <div class="job-card-header-top">
+                <div class="company-info">
+                    <h2>JYOTI AUTO PARTS</h2>
+                    <p>Near Hata Road Petrol Pump</p>
+                    <p>Se 200 Meter Aage, Purwa Chauraha, Deoria</p>
+                    <p>GSTIN: 09ZPDP5217B1ZW</p>
+                </div>
+                <div style="text-align: right;">
+                    <div class="field-group" style="justify-content: flex-end; margin-bottom: 8px;">
+                        <label>JOB CARD No.</label>
+                        <span class="value" style="font-weight: bold; font-size: 16px;">${jobCard.job_number}</span>
+                    </div>
+                    ${jobCard.vehicle_tag_no ? `<div class="field-group" style="justify-content: flex-end;">
+                        <label>Vehicle Tag No.</label>
+                        <span class="value">${jobCard.vehicle_tag_no}</span>
+                    </div>` : ''}
+                </div>
+            </div>
+
+            <div class="job-card-title">JOB CARD</div>
+
+            <div class="header-fields">
+                <div class="field-group">
+                    <label>In Date/Time:</label>
+                    <span class="value">${jobCard.in_date || ''} ${jobCard.in_time || ''}</span>
+                </div>
+                <div class="field-group">
+                    <label>Exp. Delivery:</label>
+                    <span class="value">${jobCard.exp_delivery_date || ''} ${jobCard.exp_delivery_time || ''}</span>
+                </div>
+                <div class="field-group">
+                    <label>Out Date/Time:</label>
+                    <span class="value">${jobCard.out_date || ''} ${jobCard.out_time || ''}</span>
+                </div>
+            </div>
+
+            <div class="priority-section">
+                <strong>PRIORITY IDENTIFICATION:</strong>
+                <span>${jobCard.priority_booked_vehicle ? '☑' : '☐'} Booked Vehicle</span>
+                <span>${jobCard.priority_customer_waiting ? '☑' : '☐'} Customer Waiting</span>
+                <span>${jobCard.priority_repeat_job ? '☑' : '☐'} Repeat Job</span>
+            </div>
+        </div>
+
+        <div class="details-section">
+            <div class="customer-details">
+                <div class="section-title">CUSTOMER DETAILS</div>
+                <div class="form-row"><label>Name:</label><span class="value">${customerName}</span></div>
+                <div class="form-row"><label>Address:</label><span class="value">${customerAddress}</span></div>
+                <div class="form-row"><label>Phone No.:</label><span class="value">${customerPhone}</span></div>
+                <div class="form-row"><label>E-Mail:</label><span class="value">${customerEmail}</span></div>
+            </div>
+
+            <div class="vehicle-details">
+                <div class="section-title">VEHICLE DETAILS</div>
+                <div class="form-row"><label>MODEL:</label><span class="value">${jobCard.vehicle_model || ''}</span></div>
+                <div class="form-row"><label>TYPE:</label><span class="value">${jobCard.vehicle_type || ''}</span></div>
+                <div class="form-row"><label>FRAME NO.:</label><span class="value">${jobCard.frame_no || ''}</span></div>
+                <div class="form-row"><label>ENGINE NO.:</label><span class="value">${jobCard.engine_no || ''}</span></div>
+                <div class="form-row"><label>COLOUR:</label><span class="value">${jobCard.colour || ''}</span></div>
+                <div class="form-row"><label>REGISTRATION NO:</label><span class="value">${jobCard.registration_no || jobCard.vehicle_number || ''}</span></div>
+                <div class="form-row"><label>KMS RUN:</label><span class="value">${jobCard.kms_run || ''}</span></div>
+            </div>
+        </div>
+
+        ${tasks && tasks.length > 0 ? `
+        <div style="border: 2px solid #000; border-top: none; padding: 15px;">
+            <div class="section-title" style="margin: -15px -15px 10px -15px;">TASKS / CUSTOMER REQUESTS</div>
+            <ul style="font-size: 12px; padding-left: 20px;">
+                ${tasks.map(t => `<li>${t.task_description} <em style="color: #666;">(${t.status})</em></li>`).join('')}
+            </ul>
+        </div>` : ''}
+
+        ${stockItems && stockItems.length > 0 ? `
+        <div style="border: 2px solid #000; border-top: none; padding: 15px;">
+            <div class="section-title" style="margin: -15px -15px 10px -15px;">PARTS USED</div>
+            <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid #000;">
+                        <th style="text-align: left; padding: 5px;">Part Name</th>
+                        <th style="text-align: right; padding: 5px;">Qty</th>
+                        <th style="text-align: right; padding: 5px;">Unit Price</th>
+                        <th style="text-align: right; padding: 5px;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${stockItems.map(item => `
+                    <tr>
+                        <td style="padding: 5px;">${item.product_name}</td>
+                        <td style="text-align: right; padding: 5px;">${item.quantity}</td>
+                        <td style="text-align: right; padding: 5px;">₹${item.unit_price.toFixed(2)}</td>
+                        <td style="text-align: right; padding: 5px;">₹${item.total_price.toFixed(2)}</td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>` : ''}
+
+        ${jobCard.remarks || jobCard.additional_voice || jobCard.final_service_remarks ? `
+        <div style="border: 2px solid #000; border-top: none; padding: 15px;">
+            <div class="section-title" style="margin: -15px -15px 10px -15px;">REMARKS & NOTES</div>
+            ${jobCard.additional_voice ? `<p style="font-size: 12px; margin-bottom: 8px;"><strong>Additional Voice:</strong> ${jobCard.additional_voice}</p>` : ''}
+            ${jobCard.final_service_remarks ? `<p style="font-size: 12px; margin-bottom: 8px;"><strong>Final Service Remarks:</strong> ${jobCard.final_service_remarks}</p>` : ''}
+            ${jobCard.remarks ? `<p style="font-size: 12px;"><strong>Remarks:</strong> ${jobCard.remarks}</p>` : ''}
+        </div>` : ''}
+
+        <div style="border: 2px solid #000; border-top: none; padding: 15px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 12px;">
+                <div>
+                    ${jobCard.service_advisor_name ? `<p><strong>Service Advisor:</strong> ${jobCard.service_advisor_name}</p>` : ''}
+                    ${jobCard.technician_name ? `<p><strong>Technician:</strong> ${jobCard.technician_name}</p>` : ''}
+                </div>
+                <div>
+                    ${jobCard.estimated_cost ? `<p><strong>Estimated Cost:</strong> ₹${jobCard.estimated_cost}</p>` : ''}
+                    ${jobCard.amount_rs ? `<p><strong>Amount:</strong> ₹${jobCard.amount_rs}</p>` : ''}
+                </div>
+            </div>
+        </div>
+
+        <div style="border: 2px solid #000; border-top: none; padding: 20px;">
+            <div style="text-align: center; font-size: 11px; color: #666;">
+                <p>Created: ${new Date(jobCard.created_at).toLocaleString('en-IN')}</p>
+                ${jobCard.closed_at ? `<p>Closed: ${new Date(jobCard.closed_at).toLocaleString('en-IN')}</p>` : ''}
+                <p style="margin-top: 10px;">Status: <strong>${jobCard.status.toUpperCase()}</strong></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+        `;
+
+        res.send(html);
+      });
+    });
   });
 });
 
