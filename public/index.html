@@ -399,25 +399,27 @@ const API_URL = window.location.hostname === 'localhost'
         finally { setLoadingServiceHistory(false); setShowServiceHistory(true); }
       };
 
-      // job card quick-create (simple inline modal)
-      const [showCreateJobCard, setShowCreateJobCard] = useState(false);
-      const [jcCustomer, setJcCustomer] = useState(null);
-      const [jcVehicle, setJcVehicle] = useState('');
-      const [jcTasks, setJcTasks] = useState(['']);
+      // Comprehensive job card modal for creating from customer
+      const [showComprehensiveJobCard, setShowComprehensiveJobCard] = useState(false);
+      const [jobCardPrefilledData, setJobCardPrefilledData] = useState({});
 
-      const openCreateJobCardFor = (customer) => { setJcCustomer(customer); setJcVehicle(customer.vehicle_number || ''); setJcTasks(['']); setShowCreateJobCard(true); };
+      // View job card modal from service history
+      const [showViewJobCardModal, setShowViewJobCardModal] = useState(false);
+      const [viewJobCardId, setViewJobCardId] = useState(null);
 
-      const createJobCardInline = async () => {
-        if (!jcCustomer) return showError('No customer selected', 'Validation Error');
-        const tasks = jcTasks.map(t => t.trim()).filter(Boolean);
-        if (tasks.length === 0) return showError('Add at least one task', 'Validation Error');
-        setCreatingJobCard(true);
-        try {
-          await apiCall('/job-cards', { method: 'POST', body: JSON.stringify({ customer_id: jcCustomer.id, vehicle_number: jcVehicle, tasks }) });
-          setShowCreateJobCard(false); setJcCustomer(null); setJcVehicle(''); setJcTasks(['']);
-          showSuccess('Job card created successfully');
-        } catch (err) { showError(err.message); }
-        finally { setCreatingJobCard(false); }
+      const openCreateJobCardFor = (customer) => {
+        // Prepare prefilled data from customer
+        const prefilledData = {
+          customer_id: customer.id,
+          customer_name: customer.name || '',
+          customer_phone: customer.phone || '',
+          customer_email: customer.email || '',
+          customer_address: customer.address || '',
+          registration_no: customer.vehicle_number || '',
+          vehicle_type: customer.vehicle_type || ''
+        };
+        setJobCardPrefilledData(prefilledData);
+        setShowComprehensiveJobCard(true);
       };
 
       // call logs inside view modal (readonly - just display)
@@ -750,32 +752,28 @@ const API_URL = window.location.hostname === 'localhost'
 
           {loadingServiceHistory && <LoadingOverlay message="Loading service history..." />}
 
-          {/* Create Job Card inline modal */}
-          {showCreateJobCard && (
-            <Modal onClose={() => setShowCreateJobCard(false)} wide={false}>
-              <h2 className="text-2xl font-bold mb-4">Create Job Card for {jcCustomer?.name}</h2>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Vehicle Number</label>
-                  <input value={jcVehicle} onChange={e=>setJcVehicle(e.target.value)} className="w-full px-3 py-2 border rounded" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tasks</label>
-                  {jcTasks.map((t, idx) => (
-                    <div key={idx} className="flex gap-2 mb-2">
-                      <input value={t} onChange={e => { const arr=[...jcTasks]; arr[idx]=e.target.value; setJcTasks(arr); }} className="flex-1 px-3 py-2 border rounded" />
-                      {jcTasks.length>1 && <button onClick={()=>setJcTasks(prev=>prev.filter((_,i)=>i!==idx))} className="px-3 py-2 bg-red-600 text-white rounded">Remove</button>}
-                    </div>
-                  ))}
-                  <button onClick={()=>setJcTasks(prev=>[...prev,''])} className="px-3 py-2 bg-gray-600 text-white rounded" disabled={creatingJobCard}>+ Add Task</button>
-                </div>
-                <div className="flex gap-3">
-                  <ButtonLoader loading={creatingJobCard} onClick={createJobCardInline} className="flex-1 px-4 py-2 bg-green-600 text-white rounded">Create</ButtonLoader>
-                  <button onClick={()=>setShowCreateJobCard(false)} className="flex-1 px-4 py-2 border rounded" disabled={creatingJobCard}>Cancel</button>
-                </div>
-              </div>
-            </Modal>
-          )}
+          {/* Comprehensive Job Card Modal - Create */}
+          <JobCardModal
+            isOpen={showComprehensiveJobCard}
+            onClose={() => {
+              setShowComprehensiveJobCard(false);
+              setJobCardPrefilledData({});
+            }}
+            mode="edit"
+            jobCardId={null}
+            prefilledData={jobCardPrefilledData}
+          />
+
+          {/* Comprehensive Job Card Modal - View from Service History */}
+          <JobCardModal
+            isOpen={showViewJobCardModal}
+            onClose={() => {
+              setShowViewJobCardModal(false);
+              setViewJobCardId(null);
+            }}
+            mode="view"
+            jobCardId={viewJobCardId}
+          />
 
           {/* View modal */}
           {showView && viewCustomer && (
@@ -866,6 +864,10 @@ const API_URL = window.location.hostname === 'localhost'
       const [showServiceHistory, setShowServiceHistory] = useState(false);
       const [serviceHistory, setServiceHistory] = useState([]);
       const [serviceHistoryCustomer, setServiceHistoryCustomer] = useState(null);
+
+      // View job card modal from service history
+      const [showViewJobCardModal, setShowViewJobCardModal] = useState(false);
+      const [viewJobCardId, setViewJobCardId] = useState(null);
 
       // call logs modal
       const [showCallLogs, setShowCallLogs] = useState(false);
@@ -1090,9 +1092,8 @@ const API_URL = window.location.hostname === 'localhost'
                             </span>
                             <button
                               onClick={() => {
-                                const token = localStorage.getItem('token');
-                                const url = `${API_URL}/job-cards/${s.id}/view?token=${encodeURIComponent(token)}`;
-                                window.open(url, '_blank');
+                                setViewJobCardId(s.id);
+                                setShowViewJobCardModal(true);
                               }}
                               className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                               title="View/Print Job Card"
@@ -1280,6 +1281,17 @@ const API_URL = window.location.hostname === 'localhost'
               </div>
             </Modal>
           )}
+
+          {/* Comprehensive Job Card Modal - View from Service History */}
+          <JobCardModal
+            isOpen={showViewJobCardModal}
+            onClose={() => {
+              setShowViewJobCardModal(false);
+              setViewJobCardId(null);
+            }}
+            mode="view"
+            jobCardId={viewJobCardId}
+          />
         </div>
       );
     }
@@ -3455,6 +3467,577 @@ const API_URL = window.location.hostname === 'localhost'
       );
     }
 
+    // Comprehensive Job Card Modal Component
+    function JobCardModal({ isOpen, onClose, mode = 'view', jobCardId = null, prefilledData = {} }) {
+      const { showError, showSuccess } = React.useContext(MessageContext);
+      const [loading, setLoading] = useState(false);
+      const [saving, setSaving] = useState(false);
+
+      // Form state - all 48+ fields
+      const [formData, setFormData] = useState({
+        job_number: '',
+        vehicle_tag_no: '',
+        in_date: new Date().toISOString().split('T')[0],
+        in_time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+        exp_delivery_date: '',
+        exp_delivery_time: '',
+        out_date: '',
+        out_time: '',
+        priority_booked_vehicle: false,
+        priority_customer_waiting: false,
+        priority_repeat_job: false,
+        customer_name: '',
+        customer_address: '',
+        customer_phone: '',
+        customer_email: '',
+        vehicle_model: '',
+        vehicle_type: '',
+        frame_no: '',
+        engine_no: '',
+        colour: '',
+        registration_no: '',
+        kms_run: '',
+        service_type_paid: false,
+        service_type_general: false,
+        service_type_amc: false,
+        service_type_accidental: false,
+        service_type_complaint: false,
+        fuel_level: 0,
+        psf_done_yes: false,
+        psf_done_no: false,
+        remarks: '',
+        estimated_cost: '',
+        payment_cash: false,
+        payment_card: false,
+        payment_credit: false,
+        payment_warranty: false,
+        invoice_no: '',
+        amount_rs: '',
+        gate_pass_no: '',
+        service_advisor_name: '',
+        technician_name: '',
+        additional_voice: '',
+        final_service_remarks: '',
+        test_ride_opening: '',
+        test_ride_closing: '',
+        customer_signature_date: ''
+      });
+
+      const isViewMode = mode === 'view';
+
+      // Load job card data when modal opens
+      useEffect(() => {
+        if (isOpen && jobCardId) {
+          loadJobCardData();
+        } else if (isOpen && Object.keys(prefilledData).length > 0) {
+          setFormData(prev => ({ ...prev, ...prefilledData }));
+          if (!prefilledData.job_number) {
+            setFormData(prev => ({ ...prev, job_number: 'AUTO' }));
+          }
+        } else if (isOpen && !jobCardId) {
+          setFormData(prev => ({ ...prev, job_number: 'AUTO' }));
+        }
+      }, [isOpen, jobCardId, prefilledData]);
+
+      const loadJobCardData = async () => {
+        setLoading(true);
+        try {
+          const response = await fetch(`${API_URL}/job-cards/${jobCardId}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (!response.ok) throw new Error('Failed to load job card');
+          const data = await response.json();
+
+          // Map backend field names to form data
+          setFormData({
+            job_number: data.job_number || '',
+            vehicle_tag_no: data.vehicle_tag_no || '',
+            in_date: data.in_date || '',
+            in_time: data.in_time || '',
+            exp_delivery_date: data.exp_delivery_date || '',
+            exp_delivery_time: data.exp_delivery_time || '',
+            out_date: data.out_date || '',
+            out_time: data.out_time || '',
+            priority_booked_vehicle: !!data.priority_booked_vehicle,
+            priority_customer_waiting: !!data.priority_customer_waiting,
+            priority_repeat_job: !!data.priority_repeat_job,
+            customer_name: data.customer_name || '',
+            customer_address: data.customer_address || '',
+            customer_phone: data.customer_phone || '',
+            customer_email: data.customer_email || '',
+            vehicle_model: data.vehicle_model || '',
+            vehicle_type: data.vehicle_type || '',
+            frame_no: data.frame_no || '',
+            engine_no: data.engine_no || '',
+            colour: data.colour || '',
+            registration_no: data.registration_no || data.vehicle_number || '',
+            kms_run: data.kms_run || '',
+            service_type_paid: !!data.service_type_paid,
+            service_type_general: !!data.service_type_general,
+            service_type_amc: !!data.service_type_amc,
+            service_type_accidental: !!data.service_type_accidental,
+            service_type_complaint: !!data.service_type_complaint,
+            fuel_level: data.fuel_level || 0,
+            psf_done_yes: !!data.psf_done_yes,
+            psf_done_no: !!data.psf_done_no,
+            remarks: data.remarks || '',
+            estimated_cost: data.estimated_cost || '',
+            payment_cash: !!data.payment_cash,
+            payment_card: !!data.payment_card,
+            payment_credit: !!data.payment_credit,
+            payment_warranty: !!data.payment_warranty,
+            invoice_no: data.invoice_no || '',
+            amount_rs: data.amount_rs || '',
+            gate_pass_no: data.gate_pass_no || '',
+            service_advisor_name: data.service_advisor_name || '',
+            technician_name: data.technician_name || '',
+            additional_voice: data.additional_voice || '',
+            final_service_remarks: data.final_service_remarks || '',
+            test_ride_opening: data.test_ride_opening || '',
+            test_ride_closing: data.test_ride_closing || '',
+            customer_signature_date: data.customer_signature_date || ''
+          });
+        } catch (error) {
+          console.error('Error loading job card:', error);
+          showError('Failed to load job card: ' + error.message);
+          onClose();
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleSave = async () => {
+        // Validation
+        if (!formData.customer_name) {
+          showError('Please enter customer name');
+          return;
+        }
+        if (!formData.registration_no) {
+          showError('Please enter vehicle registration number');
+          return;
+        }
+
+        setSaving(true);
+        try {
+          const payload = {
+            ...formData,
+            priority_booked_vehicle: formData.priority_booked_vehicle ? 1 : 0,
+            priority_customer_waiting: formData.priority_customer_waiting ? 1 : 0,
+            priority_repeat_job: formData.priority_repeat_job ? 1 : 0,
+            service_type_paid: formData.service_type_paid ? 1 : 0,
+            service_type_general: formData.service_type_general ? 1 : 0,
+            service_type_amc: formData.service_type_amc ? 1 : 0,
+            service_type_accidental: formData.service_type_accidental ? 1 : 0,
+            service_type_complaint: formData.service_type_complaint ? 1 : 0,
+            psf_done_yes: formData.psf_done_yes ? 1 : 0,
+            psf_done_no: formData.psf_done_no ? 1 : 0,
+            payment_cash: formData.payment_cash ? 1 : 0,
+            payment_card: formData.payment_card ? 1 : 0,
+            payment_credit: formData.payment_credit ? 1 : 0,
+            payment_warranty: formData.payment_warranty ? 1 : 0,
+            kms_run: parseInt(formData.kms_run) || null,
+            estimated_cost: parseFloat(formData.estimated_cost) || 0,
+            amount_rs: parseFloat(formData.amount_rs) || 0
+          };
+
+          let response;
+          if (jobCardId) {
+            // Update existing job card
+            response = await fetch(`${API_URL}/job-cards/${jobCardId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify(payload)
+            });
+          } else {
+            // Create new job card - need to find/create customer first
+            let customerId = prefilledData.customer_id || null;
+
+            if (!customerId) {
+              // Try to find existing customer
+              const searchResponse = await fetch(`${API_URL}/customers?search=${encodeURIComponent(formData.customer_phone || formData.registration_no)}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              });
+              const customers = await searchResponse.json();
+
+              if (customers && customers.length > 0) {
+                customerId = customers[0].id;
+              } else {
+                // Create new customer
+                const customerResponse = await fetch(`${API_URL}/customers`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                  },
+                  body: JSON.stringify({
+                    name: formData.customer_name,
+                    phone: formData.customer_phone,
+                    email: formData.customer_email || null,
+                    address: formData.customer_address || null,
+                    vehicle_number: formData.registration_no,
+                    vehicle_type: formData.vehicle_type || null
+                  })
+                });
+                const customerData = await customerResponse.json();
+                if (!customerResponse.ok) {
+                  throw new Error(customerData.error || 'Failed to create customer');
+                }
+                customerId = customerData.id;
+              }
+            }
+
+            // Create job card
+            response = await fetch(`${API_URL}/job-cards`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: JSON.stringify({
+                customer_id: customerId,
+                vehicle_number: formData.registration_no,
+                ...payload
+              })
+            });
+          }
+
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to save job card');
+          }
+
+          showSuccess('Job card saved successfully!');
+          onClose();
+          // Reload the page to show updated data
+          window.location.hash = window.location.hash; // Trigger refresh
+          window.location.reload();
+        } catch (error) {
+          console.error('Error saving job card:', error);
+          showError('Failed to save job card: ' + error.message);
+        } finally {
+          setSaving(false);
+        }
+      };
+
+      const handlePrint = () => {
+        window.print();
+      };
+
+      const updateField = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+      };
+
+      const toggleFuelLevel = (level) => {
+        if (!isViewMode) {
+          setFormData(prev => ({ ...prev, fuel_level: level }));
+        }
+      };
+
+      if (!isOpen) return null;
+
+      return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50">
+          <div className="min-h-screen px-4 py-6">
+            <div className="bg-white rounded-lg shadow-2xl max-w-6xl mx-auto relative">
+              {/* Close button */}
+              <button
+                onClick={onClose}
+                className="absolute top-4 right-4 text-gray-600 hover:text-gray-900 text-3xl font-bold z-10 no-print"
+              >
+                ×
+              </button>
+
+              {/* Action buttons */}
+              {!loading && (
+                <div className="border-b p-4 flex justify-center gap-3 no-print">
+                  {!isViewMode && (
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {saving ? 'Saving...' : 'Save Job Card'}
+                    </button>
+                  )}
+                  <button
+                    onClick={handlePrint}
+                    className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Print Job Card
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="px-6 py-2 border rounded hover:bg-gray-100"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+
+              {/* Job Card Form */}
+              {loading ? (
+                <div className="p-20 text-center">
+                  <div className="text-xl">Loading job card...</div>
+                </div>
+              ) : (
+                <div className="p-8" style={{ fontFamily: 'Arial, sans-serif' }}>
+                  {/* Header Section */}
+                  <div className="border-2 border-black p-4 mb-0">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h2 className="text-2xl font-bold mb-1">JYOTI AUTO PARTS</h2>
+                        <p className="text-xs">Near Hata Road Petrol Pump</p>
+                        <p className="text-xs">Se 200 Meter Aage, Purwa Chauraha, Deoria</p>
+                        <p className="text-xs">GSTIN: 09ZPDP5217B1ZW</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center justify-end mb-2">
+                          <label className="font-bold text-xs mr-2">JOB CARD No.</label>
+                          <input
+                            type="text"
+                            value={formData.job_number}
+                            readOnly
+                            className="w-24 border-b border-black px-1 py-0.5 font-bold text-base bg-gray-50"
+                          />
+                        </div>
+                        <div className="flex items-center justify-end">
+                          <label className="font-bold text-xs mr-2">Vehicle Tag No.</label>
+                          <input
+                            type="text"
+                            value={formData.vehicle_tag_no}
+                            onChange={(e) => updateField('vehicle_tag_no', e.target.value)}
+                            readOnly={isViewMode}
+                            className={`w-24 border-b border-black px-1 py-0.5 text-xs ${isViewMode ? 'bg-gray-50' : ''}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-center bg-gray-200 py-2 my-2 font-bold">JOB CARD</div>
+
+                    <div className="grid grid-cols-3 gap-2 mb-2 text-xs">
+                      <div className="flex items-center">
+                        <label className="font-bold mr-2 whitespace-nowrap">In Date/Time:</label>
+                        <input type="date" value={formData.in_date} onChange={(e) => updateField('in_date', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-black px-1 text-xs ${isViewMode ? 'bg-gray-50' : ''}`} />
+                        <input type="time" value={formData.in_time} onChange={(e) => updateField('in_time', e.target.value)} readOnly={isViewMode} className={`w-20 border-b border-black px-1 ml-1 text-xs ${isViewMode ? 'bg-gray-50' : ''}`} />
+                      </div>
+                      <div className="flex items-center">
+                        <label className="font-bold mr-2 whitespace-nowrap">Exp. Delivery:</label>
+                        <input type="date" value={formData.exp_delivery_date} onChange={(e) => updateField('exp_delivery_date', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-black px-1 text-xs ${isViewMode ? 'bg-gray-50' : ''}`} />
+                        <input type="time" value={formData.exp_delivery_time} onChange={(e) => updateField('exp_delivery_time', e.target.value)} readOnly={isViewMode} className={`w-20 border-b border-black px-1 ml-1 text-xs ${isViewMode ? 'bg-gray-50' : ''}`} />
+                      </div>
+                      <div className="flex items-center">
+                        <label className="font-bold mr-2 whitespace-nowrap">Out Date/Time:</label>
+                        <input type="date" value={formData.out_date} onChange={(e) => updateField('out_date', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-black px-1 text-xs ${isViewMode ? 'bg-gray-50' : ''}`} />
+                        <input type="time" value={formData.out_time} onChange={(e) => updateField('out_time', e.target.value)} readOnly={isViewMode} className={`w-20 border-b border-black px-1 ml-1 text-xs ${isViewMode ? 'bg-gray-50' : ''}`} />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4 items-center text-xs">
+                      <strong>PRIORITY IDENTIFICATION:</strong>
+                      <label className="flex items-center gap-1">
+                        <input type="checkbox" checked={formData.priority_booked_vehicle} onChange={(e) => updateField('priority_booked_vehicle', e.target.checked)} disabled={isViewMode} className="w-4 h-4" />
+                        <span>Booked Vehicle</span>
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input type="checkbox" checked={formData.priority_customer_waiting} onChange={(e) => updateField('priority_customer_waiting', e.target.checked)} disabled={isViewMode} className="w-4 h-4" />
+                        <span>Customer Waiting</span>
+                      </label>
+                      <label className="flex items-center gap-1">
+                        <input type="checkbox" checked={formData.priority_repeat_job} onChange={(e) => updateField('priority_repeat_job', e.target.checked)} disabled={isViewMode} className="w-4 h-4" />
+                        <span>Repeat Job</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Customer & Vehicle Details */}
+                  <div className="grid grid-cols-2 border-2 border-black border-t-0">
+                    <div className="border-r-2 border-black p-2">
+                      <div className="bg-gray-200 text-center font-bold text-xs py-1 -mx-2 mb-2">CUSTOMER DETAILS</div>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex"><label className="font-bold w-24">Name:</label><input value={formData.customer_name} onChange={(e) => updateField('customer_name', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-24">Address:</label><textarea value={formData.customer_address} onChange={(e) => updateField('customer_address', e.target.value)} readOnly={isViewMode} rows="2" className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-24">Phone No.:</label><input value={formData.customer_phone} onChange={(e) => updateField('customer_phone', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-24">E-Mail:</label><input type="email" value={formData.customer_email} onChange={(e) => updateField('customer_email', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      <div className="bg-gray-200 text-center font-bold text-xs py-1 -mx-2 mb-2">VEHICLE DETAILS</div>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex"><label className="font-bold w-32">MODEL:</label><input value={formData.vehicle_model} onChange={(e) => updateField('vehicle_model', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-32">TYPE:</label><input value={formData.vehicle_type} onChange={(e) => updateField('vehicle_type', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-32">FRAME NO.:</label><input value={formData.frame_no} onChange={(e) => updateField('frame_no', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-32">ENGINE NO.:</label><input value={formData.engine_no} onChange={(e) => updateField('engine_no', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-32">COLOUR:</label><input value={formData.colour} onChange={(e) => updateField('colour', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-32">REGISTRATION NO:</label><input value={formData.registration_no} onChange={(e) => updateField('registration_no', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-32">KMS RUN:</label><input type="number" value={formData.kms_run} onChange={(e) => updateField('kms_run', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Service Type & Condition */}
+                  <div className="grid grid-cols-12 border-2 border-black border-t-0">
+                    <div className="col-span-3 border-r-2 border-black p-2">
+                      <div className="bg-gray-200 text-center font-bold text-xs py-1 -mx-2 mb-2">TYPE OF SERVICE</div>
+                      <div className="space-y-1 text-xs">
+                        <label className="flex items-center gap-1"><input type="checkbox" checked={formData.service_type_paid} onChange={(e) => updateField('service_type_paid', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>Paid Service</span></label>
+                        <label className="flex items-center gap-1"><input type="checkbox" checked={formData.service_type_general} onChange={(e) => updateField('service_type_general', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>General Repair</span></label>
+                        <label className="flex items-center gap-1"><input type="checkbox" checked={formData.service_type_amc} onChange={(e) => updateField('service_type_amc', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>AMC</span></label>
+                        <label className="flex items-center gap-1"><input type="checkbox" checked={formData.service_type_accidental} onChange={(e) => updateField('service_type_accidental', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>Accidental</span></label>
+                        <label className="flex items-center gap-1"><input type="checkbox" checked={formData.service_type_complaint} onChange={(e) => updateField('service_type_complaint', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>Complaint</span></label>
+                      </div>
+                    </div>
+                    <div className="col-span-5 border-r-2 border-black p-2">
+                      <div className="bg-gray-200 text-center font-bold text-xs py-1 -mx-2 mb-2">PHYSICAL & PAINT CONDITION OF VEHICLE</div>
+                      <div className="flex justify-center items-center min-h-28">
+                        <div className="flex gap-2 text-3xl">
+                          <div className="text-center"><div>🛵</div><div className="text-xs mt-1">Left</div></div>
+                          <div className="text-center"><div>🛵</div><div className="text-xs mt-1">Right</div></div>
+                          <div className="text-center"><div>🏍️</div><div className="text-xs mt-1">Left</div></div>
+                          <div className="text-center"><div>🏍️</div><div className="text-xs mt-1">Right</div></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="col-span-4 p-2">
+                      <div className="bg-gray-200 text-center font-bold text-xs py-1 -mx-2 mb-2">Fuel Level</div>
+                      <div className="flex items-center gap-1 mt-2 text-xs">
+                        <span>E</span>
+                        <div className="flex gap-0.5">
+                          {[1, 2, 3, 4].map(level => (
+                            <div
+                              key={level}
+                              onClick={() => toggleFuelLevel(level)}
+                              className={`w-8 h-4 border border-black cursor-pointer ${formData.fuel_level >= level ? 'bg-black' : 'bg-white'} ${isViewMode ? 'cursor-default' : ''}`}
+                            />
+                          ))}
+                        </div>
+                        <span>F</span>
+                      </div>
+                      <div className="mt-2 text-xs">
+                        <strong>PSF Done:</strong>
+                        <div className="flex gap-3 mt-1">
+                          <label className="flex items-center gap-1"><input type="checkbox" checked={formData.psf_done_yes} onChange={(e) => updateField('psf_done_yes', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>Yes</span></label>
+                          <label className="flex items-center gap-1"><input type="checkbox" checked={formData.psf_done_no} onChange={(e) => updateField('psf_done_no', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>No</span></label>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <label className="text-xs font-bold block mb-1">Remarks:</label>
+                        <textarea value={formData.remarks} onChange={(e) => updateField('remarks', e.target.value)} readOnly={isViewMode} className={`w-full h-9 border border-gray-400 text-xs p-1 ${isViewMode ? 'bg-gray-50' : ''}`} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom Section */}
+                  <div className="grid grid-cols-2 border-2 border-black border-t-0">
+                    <div className="border-r-2 border-black p-2">
+                      <div className="mb-2 text-xs">
+                        <strong>Service Advisor Name:</strong>
+                        <input value={formData.service_advisor_name} onChange={(e) => updateField('service_advisor_name', e.target.value)} readOnly={isViewMode} className={`w-full border-b border-gray-400 mt-1 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} />
+                      </div>
+                      <div className="mb-2 text-xs">
+                        <strong>Technician Name:</strong>
+                        <input value={formData.technician_name} onChange={(e) => updateField('technician_name', e.target.value)} readOnly={isViewMode} className={`w-full border-b border-gray-400 mt-1 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} />
+                      </div>
+                      <div className="text-xs p-2 border border-gray-400 min-h-16">
+                        <p>I certify that the work has been done to my satisfaction and I have taken the delivery of my vehicle.</p>
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      <div className="mb-2 text-xs">
+                        <strong>Estimated Cost Rs.</strong>
+                        <input type="number" value={formData.estimated_cost} onChange={(e) => updateField('estimated_cost', e.target.value)} readOnly={isViewMode} className={`w-full border-b border-gray-400 mt-1 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} />
+                      </div>
+                      <div className="mb-2 text-xs">
+                        <strong>Payment Details:</strong>
+                        <div className="flex gap-3 mt-2">
+                          <label className="flex items-center gap-1"><input type="checkbox" checked={formData.payment_cash} onChange={(e) => updateField('payment_cash', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>Cash</span></label>
+                          <label className="flex items-center gap-1"><input type="checkbox" checked={formData.payment_card} onChange={(e) => updateField('payment_card', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>Card</span></label>
+                          <label className="flex items-center gap-1"><input type="checkbox" checked={formData.payment_credit} onChange={(e) => updateField('payment_credit', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>Credit</span></label>
+                          <label className="flex items-center gap-1"><input type="checkbox" checked={formData.payment_warranty} onChange={(e) => updateField('payment_warranty', e.target.checked)} disabled={isViewMode} className="w-3.5 h-3.5" /><span>Warranty</span></label>
+                        </div>
+                      </div>
+                      <div className="space-y-1 text-xs mt-3">
+                        <div className="flex"><label className="font-bold w-28">Invoice No.</label><input value={formData.invoice_no} onChange={(e) => updateField('invoice_no', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-28">Amount Rs.</label><input type="number" value={formData.amount_rs} onChange={(e) => updateField('amount_rs', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                        <div className="flex"><label className="font-bold w-28">Gate Pass No.</label><input value={formData.gate_pass_no} onChange={(e) => updateField('gate_pass_no', e.target.value)} readOnly={isViewMode} className={`flex-1 border-b border-gray-400 px-1 ${isViewMode ? 'bg-gray-50' : ''}`} /></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Signature Section */}
+                  <div className="grid grid-cols-2 border-2 border-black border-t-0 p-4">
+                    <div className="text-center">
+                      <div className="text-xs mb-1">
+                        <strong>Date:</strong>
+                        <input type="date" value={formData.customer_signature_date} onChange={(e) => updateField('customer_signature_date', e.target.value)} readOnly={isViewMode} className={`border-b border-gray-400 ml-2 ${isViewMode ? 'bg-gray-50' : ''}`} />
+                      </div>
+                      <div className="border-t border-black pt-1 mt-10 text-xs">Customer's Signature</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="border-t border-black pt-1 mt-14 text-xs">Cashier's Signature</div>
+                    </div>
+                  </div>
+
+                  {/* Gate Pass */}
+                  <div className="border-2 border-black mt-4 p-4">
+                    <div className="flex justify-between items-start border-b border-dashed border-black pb-2 mb-2">
+                      <div>
+                        <h2 className="text-xl font-bold">JYOTI AUTO PARTS</h2>
+                        <p className="text-xs">Near Hata Road Petrol Pump Se 200 Meter Aage, Purwa Chauraha, Deoria</p>
+                      </div>
+                      <div className="text-center">
+                        <strong className="text-sm">Customer's Copy/Gate Pass</strong>
+                      </div>
+                      <div className="text-right">
+                        <strong className="text-sm">JOB CARD No.</strong>
+                        <span className="text-base ml-2">{formData.job_number}</span>
+                      </div>
+                    </div>
+                    <div className="text-xs">
+                      <p><strong>Workshop Timing:</strong> 09:30 am to 7:00 pm</p>
+                      <p><strong>Lunch:</strong> 2:00 pm to 2:30 pm</p>
+                      <p><strong>Weekly off:</strong> Saturday</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-3 text-xs">
+                      <div className="space-y-1">
+                        <div className="flex"><label className="font-bold w-32">Date:</label><span className="flex-1 border-b border-gray-400">{formData.in_date}</span></div>
+                        <div className="flex"><label className="font-bold w-32">Vehicle No:</label><span className="flex-1 border-b border-gray-400">{formData.registration_no}</span></div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex"><label className="font-bold w-40">Estimated Delivery Time:</label><span className="flex-1 border-b border-gray-400">{formData.exp_delivery_date} {formData.exp_delivery_time}</span></div>
+                        <div className="flex"><label className="font-bold w-40">Estimated Cost Rs.:</label><span className="flex-1 border-b border-gray-400">{formData.estimated_cost}</span></div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-3 text-xs">
+                      <div className="flex"><label className="font-bold w-40">Service Advisor Name:</label><span className="flex-1 border-b border-gray-400">{formData.service_advisor_name}</span></div>
+                      <div className="text-right border-t border-black pt-1">Customer Signature</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <style>{`
+            @media print {
+              .no-print {
+                display: none !important;
+              }
+              body {
+                background: white;
+              }
+              .fixed {
+                position: relative;
+              }
+            }
+          `}</style>
+        </div>
+      );
+    }
+
     function JobCards() {
       const { showError, showSuccess } = React.useContext(MessageContext);
       const [jobCards, setJobCards] = useState([]);
@@ -3472,6 +4055,11 @@ const API_URL = window.location.hostname === 'localhost'
       const [showRejectModal, setShowRejectModal] = useState(false);
       const [currentJobCard, setCurrentJobCard] = useState(null);
       const [products, setProducts] = useState([]);
+
+      // Comprehensive job card modal states
+      const [showComprehensiveModal, setShowComprehensiveModal] = useState(false);
+      const [comprehensiveModalMode, setComprehensiveModalMode] = useState('view');
+      const [comprehensiveJobCardId, setComprehensiveJobCardId] = useState(null);
 
       // Task management states
       const [showAddTaskModal, setShowAddTaskModal] = useState(false);
@@ -3649,9 +4237,13 @@ const API_URL = window.location.hostname === 'localhost'
         finally { setCreatingJobCard(false); }
       };
 
-      const viewJobCard = async (id) => {
-        // Open comprehensive job card form in edit mode
-        window.location.href = `/jobcards.html?id=${id}`;
+      const viewJobCard = async (id, jobStatus = null) => {
+        // Open comprehensive job card modal
+        // Edit mode for 'open' jobs, view mode for 'closed' jobs
+        const mode = jobStatus === 'open' ? 'edit' : 'view';
+        setComprehensiveJobCardId(id);
+        setComprehensiveModalMode(mode);
+        setShowComprehensiveModal(true);
       };
 
       const addStockItem = async () => {
@@ -4047,7 +4639,11 @@ const API_URL = window.location.hostname === 'localhost'
             </div>
             <div className="flex justify-end">
               <button
-                onClick={() => window.location.href = '/jobcards.html'}
+                onClick={() => {
+                  setComprehensiveJobCardId(null);
+                  setComprehensiveModalMode('edit');
+                  setShowComprehensiveModal(true);
+                }}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 + Create Job Card
@@ -4075,7 +4671,7 @@ const API_URL = window.location.hostname === 'localhost'
                       job.status === 'open' ? 'border-green-500' :
                       job.status === 'closed' ? 'border-gray-500' : 'border-red-500'
                     }`}
-                    onClick={() => viewJobCard(job.id)}
+                    onClick={() => viewJobCard(job.id, job.status)}
                   >
                     <div className="flex justify-between items-start mb-4">
                       <div className="text-lg font-bold text-blue-600">{job.job_number}</div>
@@ -4135,6 +4731,17 @@ const API_URL = window.location.hostname === 'localhost'
             )}
           </SectionLoader>
 
+          {/* Comprehensive Job Card Modal */}
+          <JobCardModal
+            isOpen={showComprehensiveModal}
+            onClose={() => {
+              setShowComprehensiveModal(false);
+              setComprehensiveJobCardId(null);
+              setComprehensiveModalMode('view');
+            }}
+            mode={comprehensiveModalMode}
+            jobCardId={comprehensiveJobCardId}
+          />
 
         </div>
       );
