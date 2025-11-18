@@ -1181,12 +1181,56 @@ async function saveJobCard() {
         body: JSON.stringify(formData)
       });
     } else {
-      // Create new job card - need customer_id and vehicle_number
-      // For now, we'll create a simple job card
-      alert('Please create customers first from the Customers section, then create job cards from there.');
-      window.location.href = '/#customers';
-      return;
-    }
+      // Create new job card
+      // Find or create customer based on provided details
+      let customerId = null;
+
+      // Try to find existing customer by phone or registration number
+      const searchResponse = await fetch(`${API_URL}/customers?search=${encodeURIComponent(formData.customer_phone || formData.registration_no)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const customers = await searchResponse.json();
+      if (customers && customers.length > 0) {
+        customerId = customers[0].id;
+      } else {
+        // Create new customer
+        const customerResponse = await fetch(`${API_URL}/customers`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            name: formData.customer_name,
+            phone: formData.customer_phone,
+            email: formData.customer_email || null,
+            address: formData.customer_address || null,
+            vehicle_number: formData.registration_no,
+            vehicle_type: formData.vehicle_type || null
+          })
+        });
+
+        const customerData = await customerResponse.json();
+        if (!customerResponse.ok) {
+          throw new Error(customerData.error || 'Failed to create customer');
+        }
+        customerId = customerData.id;
+      }
+
+      // Now create the job card
+      response = await fetch(`${API_URL}/job-cards`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          customer_id: customerId,
+          vehicle_number: formData.registration_no,
+          ...formData
+        })
+      });
 
     const data = await response.json();
 
