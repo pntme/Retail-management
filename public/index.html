@@ -3650,10 +3650,8 @@ const API_URL = window.location.hostname === 'localhost'
       };
 
       const viewJobCard = async (id) => {
-        // Open the new comprehensive job card view in a new tab
-        const token = localStorage.getItem('token');
-        const url = `${API_URL}/job-cards/${id}/view?token=${encodeURIComponent(token)}`;
-        window.open(url, '_blank');
+        // Open comprehensive job card form in edit mode
+        window.location.href = `/jobcards.html?id=${id}`;
       };
 
       const addStockItem = async () => {
