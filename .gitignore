@@ -2,8 +2,11 @@
 node_modules/
 npm-debug.log
 yarn-error.log
-package-lock.json
 yarn.lock
+
+# Note: package-lock.json excluded for backend
+# Mobile app has its own in RetailManagementApp/
+package-lock.json
 
 # Database
 *.db
