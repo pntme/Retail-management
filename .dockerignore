@@ -1,0 +1,18 @@
+# Exclude mobile app from backend deployment
+RetailManagementApp/
+
+# Node modules (will be installed during build)
+node_modules/
+
+# Development files
+.git/
+.gitignore
+
+# Documentation (not needed in production)
+*.md
+!README.md
+
+# Temporary files
+*.log
+.DS_Store
+*.swp
