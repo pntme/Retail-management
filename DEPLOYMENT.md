@@ -122,7 +122,31 @@ docker-compose up -d
 
 ## 2. Cloud Deployment
 
-### Railway Deployment (Recommended - With Data Persistence)
+### Render Deployment (Recommended - Simple & Free)
+
+**Easy deployment with persistent storage built-in!**
+
+See **[RENDER-DEPLOYMENT.md](./RENDER-DEPLOYMENT.md)** for detailed instructions.
+
+**Quick Start:**
+
+1. Push code to GitHub
+2. Go to [render.com](https://render.com)
+3. Click "New +" → "Blueprint"
+4. Connect your GitHub repository
+5. Render auto-detects `render.yaml` and configures everything
+6. Click "Apply" - Done!
+
+**Why Render?**
+- ✅ Easiest deployment (Blueprint configuration included)
+- ✅ Free tier available (750 hours/month)
+- ✅ Automatic HTTPS
+- ✅ Built-in persistent disk storage
+- ✅ No credit card required for free tier
+- ✅ Zero-downtime deploys
+- ✅ Built-in metrics and monitoring
+
+### Railway Deployment (Alternative Option)
 
 **⚠️ IMPORTANT: Railway uses ephemeral storage. You MUST use volumes to prevent data loss!**
 
