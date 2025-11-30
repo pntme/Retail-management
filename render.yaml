@@ -2,14 +2,13 @@ services:
   - type: web
     name: retail-management
     runtime: node
-    plan: starter
     buildCommand: npm install
     startCommand: node server.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3001
+        value: 10000
       - key: DATA_DIR
         value: /data
       - key: DB_PATH
