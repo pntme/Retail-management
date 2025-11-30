@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: retail-management
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATA_DIR
+        value: /data
+      - key: DB_PATH
+        value: /data/retail.db
+      - key: UPLOADS_DIR
+        value: /data/uploads
+      - key: JWT_SECRET
+        generateValue: true
+    disk:
+      name: retail-data
+      mountPath: /data
+      sizeGB: 1
+    healthCheckPath: /
+    autoDeploy: true

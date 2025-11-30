@@ -228,16 +228,26 @@ const API_URL = 'http://localhost:3001/api';
 
 ## 📱 Deployment
 
+### Cloud Deployment (Recommended)
+
+**🚀 Deploy to Render (Easiest & Free):**
+- See detailed guide: **[RENDER-DEPLOYMENT.md](./RENDER-DEPLOYMENT.md)**
+- Quick start: Push to GitHub → Connect to Render → Click Deploy
+- Free tier available with persistent storage
+- Automatic HTTPS and custom domain support
+
+**🚂 Deploy to Railway:**
+- See detailed guide: **[RAILWAY-DEPLOYMENT.md](./RAILWAY-DEPLOYMENT.md)**
+- Similar to Render, requires volume setup for data persistence
+
+**📚 Complete Deployment Guide:**
+- See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for all deployment options
+- Includes: Render, Railway, Heroku, DigitalOcean, AWS EC2, Docker, and VPS setup
+
 ### Local Network Deployment
 1. Find your computer's IP address
 2. Update API_URL in index.html to `http://YOUR-IP:3001/api`
 3. Other devices can access via `http://YOUR-IP:3001`
-
-### Production Deployment
-Consider deploying to:
-- AWS EC2, DigitalOcean, or Linode (VPS)
-- Heroku (with PostgreSQL addon instead of SQLite)
-- Docker container
 
 ## 🐛 Troubleshooting
 
