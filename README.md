@@ -228,21 +228,42 @@ const API_URL = 'http://localhost:3001/api';
 
 ## 📱 Deployment
 
-### Cloud Deployment (Recommended)
+### 🌐 Web-Only Deployment (No CLI/Local Setup Required)
 
-**🚀 Deploy to Render (Easiest & Free):**
+**⭐ RECOMMENDED: Deploy without installing anything on your computer!**
+
+**[WEB-ONLY-DEPLOYMENT.md](./WEB-ONLY-DEPLOYMENT.md)** - Complete guide to deploy via browser only
+
+**Quick Options:**
+
+1. **Cyclic** (Easiest - 2 minutes):
+   - Go to https://www.cyclic.sh
+   - Login with GitHub → Select repository → Deploy
+   - Zero configuration needed!
+
+2. **Railway** (Simple - 5 minutes):
+   - Go to https://railway.app
+   - Login with GitHub → Deploy from repo
+   - Add volume for data persistence
+
+3. **Render** (Web Service - 10 minutes):
+   - Go to https://render.com
+   - Create Web Service (not Static Site!)
+   - Add disk and environment variables
+
+### Traditional Cloud Deployment
+
+**🚀 Deploy to Render:**
 - See detailed guide: **[RENDER-DEPLOYMENT.md](./RENDER-DEPLOYMENT.md)**
-- Quick start: Push to GitHub → Connect to Render → Click Deploy
-- Free tier available with persistent storage
-- Automatic HTTPS and custom domain support
+- Requires manual configuration
 
 **🚂 Deploy to Railway:**
 - See detailed guide: **[RAILWAY-DEPLOYMENT.md](./RAILWAY-DEPLOYMENT.md)**
-- Similar to Render, requires volume setup for data persistence
+- Similar to Render, requires volume setup
 
-**📚 Complete Deployment Guide:**
-- See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for all deployment options
-- Includes: Render, Railway, Heroku, DigitalOcean, AWS EC2, Docker, and VPS setup
+**📚 All Deployment Options:**
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Full deployment guide
+- **[DEPLOYMENT-ALTERNATIVES.md](./DEPLOYMENT-ALTERNATIVES.md)** - Render/Railway alternatives
 
 ### Local Network Deployment
 1. Find your computer's IP address
